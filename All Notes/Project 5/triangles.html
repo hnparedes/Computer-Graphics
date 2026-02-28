@@ -1,0 +1,264 @@
+<!DOCTYPE HTML>
+<HTML lang="en">
+    <Head>
+        <Title> Project 5 </Title>
+        <style>
+
+            body
+            {
+
+                margin: 0;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+                background-color: #f0f0f0;
+                font-family: sans-serif;
+
+            }
+            canvas
+            {
+
+                border: 1px solid #ccc;
+                background-color: white;
+
+            }
+            .controls
+            {
+
+                margin-bottom: 20px;
+                padding: 10px;
+                background: #fff;
+                border-radius: 8px;
+                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+
+            }
+            button
+            {
+
+                padding: 10px 15px;
+                margin: 0 5px;
+                cursor: pointer;
+
+            }
+
+        </style>
+        <script id="2dVertexShader", type="notjs">
+
+            // Canvas body layout taken from Project 4 and expanded by Gemini
+            attribute vec4 a_position;
+            attribute vec3 a_color;
+            varying vec3 v_color;
+            void main()
+            {
+
+                v_color = a_color;
+                gl_Position = a_position;
+
+            }
+
+        </script>
+
+        <script id="2dFragmentShader", type="notjs">
+
+            precision mediump float;
+            varying vec3 v_color;
+            void main()
+            {
+
+                gl_FragColor = vec4(v_color, 1);
+
+            }
+
+        </script>
+
+        <script>
+
+            class WebGLRenderer
+            {
+
+                constructor(canvasId)
+                {
+
+                    this.canvas = document.getElementById(canvasId);
+                    this.gl = this.canvas.getContext("webgl");
+
+                    // Part C
+                    // Add Variable instide Object that will change how Vertices are Rendered
+                    this.renderMode = 0;
+                    if(!this.gl)
+                    {
+
+                        alert("WebGL not supported");
+                        return;
+
+                    }
+
+                    this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+                    this.gl.clearColor(1, 1, 1, 1);
+                    this.program = null;
+                    this.buffer = this.gl.createBuffer();
+
+                }
+
+                initProgram(vsId, fsId)
+                {
+
+                    const vsSource = document.getElementById(vsId).text;
+                    const fsSource = document.getElementById(fsId).text;
+
+                    const vs = this.createShader(this.gl.VERTEX_SHADER, vsSource);
+                    const fs = this.createShader(this.gl.FRAGMENT_SHADER, fsSource);
+
+                    this.program = this.gl.createProgram();
+                    this.gl.attachShader(this.program, vs);
+                    this.gl.attachShader(this.program, fs);
+                    this.gl.linkProgram(this.program);
+                    this.gl.useProgram(this.program);
+
+                }
+
+                createShader(type, source)
+                {
+
+                    const shader = this.gl.createShader(type);
+                    this.gl.shaderSource(shader, source);
+                    this.gl.compileShader(shader);
+                    return shader;
+
+                }
+
+                // Part A
+                // One WebGL Object to Render
+                render(vertices)
+                {
+
+                    const gl = this.gl;
+                    const posLocation = gl.getAttribLocation(this.program, "a_position");
+                    const colorLocation = gl.getAttribLocation(this.program, "a_color");
+
+                    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+                    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+
+                    gl.enableVertexAttribArray(posLocation);
+                    gl.enableVertexAttribArray(colorLocation);
+
+                    const stride = 5 * 4;
+                    gl.vertexAttribPointer(posLocation, 2, gl.FLOAT, false, stride, 0);
+                    gl.vertexAttribPointer(colorLocation, 3, gl.FLOAT, false, stride, 2 * 4);
+
+                    // Part C.a
+                    // Logic to choose Primitive Mode based on Variable
+                    let primitive;
+                    if(this.renderMode == 0)
+                    {
+
+                        primitive = gl.TRIANGLES; // i
+
+                    }
+                    else if(this.renderMode == 1)
+                    {
+
+                        primitive = gl.TRIANGLE_STRIP; // ii
+
+                    }
+                    else if(this.renderMode == 2)
+                    {
+
+                        primitive = gl.TRIANGLE_FAN; // iii
+
+                    }
+
+                    // Part H
+                    // Clear screen with gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+                    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+                    // Part I
+                    // Re-Render the object with new mode
+                    gl.drawArrays(primitive, 0, vertices.length / 5);
+
+                }
+
+            }
+
+            // Part D
+            // Create a simple main class
+            class main
+            {
+
+                constructor()
+                {
+
+                    // Part D.a
+                    // Constructor instantiates the object
+                    this.renderer = new WebGLRenderer("myCanvas");
+                    this.renderer.initProgram("2dVertexShader", "2dFragmentShader");
+
+                    // Part B
+                    // Vertices (X,Y), Z is 0
+                    this.vertexData = [
+                        0.0, 0.5,       0, 0, 1,
+                        1.0, 0.5,       1, 0, 0,
+                        0.5, 1.0,       1, 1, 0,
+                        0.5, 0.0,       0, 1, 1,
+                        0.0, -1.0,      1, 0, 1,
+                        -0.5, 0.0,      1, 1, 1
+
+                    ];
+
+                    this.render();
+
+                }
+
+                // Part G
+                // Will set the Objects Variable appropriately
+                changeRenderMode(mode)
+                {
+
+                    this.renderer.renderMode = mode;
+                    this.render();
+
+                }
+
+                render()
+                {
+
+                    this.renderer.render(this.vertexData);
+
+                }
+
+            }
+
+            // Part F
+            // Send input to global function to main class
+            function handleModeChange(val)
+            {
+
+                m.changeRenderMode(parseInt(val));
+
+            }
+
+            // Part E
+            // Three Buttons with Three different Rendering Styles
+
+        </script>
+    </Head>
+    <Body>
+        <div class="controls">
+            <strong> Rendering: </strong>
+            <button onclick="handleModeChange(0)"> Triangles </button>
+            <button onclick="handleModeChange(1)"> Triangle Strip </button>
+            <button onclick="handleModeChange(2)"> Triangle Fan </button>
+        </div>
+
+        <canvas id="myCanvas" width="640" height="400">
+            Your browser does not support canvas
+        </canvas>
+
+        <script>
+
+            var m = new main();
+
+        </script>
+    </Body>
+</HTML>

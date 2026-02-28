@@ -1,0 +1,100 @@
+<!-- This HTML file is written for academic purposes -->
+<!-- Author: Dr. Bradford A. Towle Jr. -->
+<!-- Date: 4/30/2019 -->
+
+<HTML lang="en">
+	<HEAD>
+		<META CHARSET="UTF-8">
+		<TITLE>Your Title Goes Here</TITLE>
+		<!-- This is a comment in HTML -->
+		<!-- The Head will also contain all 
+				.css file imports
+				.js file Imports
+		-->
+		<script>
+			function testMe()
+			{
+				console.log("This is a comment");
+				console.warn("Warning!");
+				console.error("This is an error.")
+				console.log("The global variable i = "+i);
+				var j = 10;  //Use var to define a local variable.
+							 //Otherwise it could conflict with the global scope.
+			}
+			function HTMLConsole(msg)
+			{
+				//We can use JavaScript to alter the innerHTML (or contents)
+				//of different sections, articles, paragraphs, divs, or spans.
+				var myCon = document.getElementById("console");
+				var temp = myCon.innerHTML;
+				//This is how you would add a comment
+				var comment = "<p style='color: #000;'><strong>"+msg+"</strong></p>";
+				//This is how you would add a warning
+				var warning = "<p style='color: #DDDD00;'><strong>"+msg+"</strong></p>";
+				//This is how you would add an error!
+				var error = "<p style='color: #F00;'><strong>"+msg+"</strong></p>";
+				temp += comment;
+				temp += warning;
+				temp += error;
+				myCon.innerHTML = temp;
+			}
+			function Logic()
+			{
+				var temp = 10;
+				if(temp == 10)
+				{
+				}
+				else if(temp < 0)
+				{
+				}
+				else
+				{
+				}
+				
+				while(temp > 0)
+				{
+				console.log("temp in while loop ="+temp);
+				temp --;
+				}
+				
+				for(temp =0; temp < 10; temp ++)
+				{
+					console.log("temp in for loop ="+temp);
+				}
+				do{
+				temp --;
+				console.log("temp in do-while loop = "+temp);
+				}while(temp>0);
+				
+				
+			}
+		
+		</script>
+
+	</HEAD>
+	<BODY>
+		<HEADER>
+			<H1>Java Script Review</H1>			
+		</HEADER>
+		<Section ID="console" style="border: 2px solid #000;">
+		
+		</section>
+		<script>
+			//This is an inline JavaScript tag.
+			//If I have any code outside of a function or class
+			//It will start running.
+			//Any variables I declare outside of a function or class
+			//will be global.
+			
+			//This is a global variable.
+			//We want to MINIMIZE these at all cost.
+			i = 10;
+			
+			testMe();//I can call this because JS has seen it before.
+			HTMLConsole("Hello World!");
+			Logic();
+			
+		</script>
+	</BODY>
+
+</HTML>

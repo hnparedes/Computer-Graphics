@@ -1,0 +1,56 @@
+<!-- This HTML file is written for academic purposes -->
+<!-- Author: Dr. Bradford A. Towle Jr. -->
+<!-- Date: 4/30/2019 -->
+
+<HTML lang="en">
+	<HEAD>
+		<META CHARSET="UTF-8">
+		<TITLE>JavaScript and HTML Interaction</TITLE>
+		<SCRIPT>
+			class main
+			{
+				constructor()
+				{
+					//This is how you find an object in HTML
+					//The only limitation is it must be declared BEFORE THIS code runs.
+					this.consoleSection = document.getElementById("console");
+					//This is how you could add to it.  Remember, it is HTML.
+					this.consoleSection.innerHTML += "<br>This code was added dynamically!<br>"
+					
+					//Now lets add an image.
+					this.myImg = new Image();
+					this.myImg.src = "slime.png";
+					this.myImg.alt = "No picture found";
+					this.myImg.width = "64";
+					this.myImg.height = "64";
+					document.body.appendChild(this.myImg);
+					//I can change properties AFTER I add it as well.
+					//this.myImg.alt ="Bad Pic";
+				}
+				classFunction()
+				{ //Classes can have different functions
+				}
+				HandleClick()
+				{
+				console.log("Inside Main's handle click")
+				}
+			}
+			function onClick()
+			{	//Call backs CANNOT go directly to classes, therefore you 
+				//must have a proxy function.
+				console.log("Inside global function handle click")
+				//Now Call my Main
+				myMain.HandleClick();
+			}
+		</SCRIPT>
+		</HEAD>
+	<BODY onclick="onClick();">
+		<HEADER><H1>Skeleton Project for JavaScript</H1></HEADER>
+		<SECTION id = "console"></SECTION>
+		<SCRIPT>
+			myMain = new main();
+			
+		</SCRIPT>
+	</BODY>
+
+</HTML>

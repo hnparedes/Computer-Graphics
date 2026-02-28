@@ -1,0 +1,41 @@
+<!-- This HTML file is written for academic purposes -->
+<!-- Author: Dr. Bradford A. Towle Jr. -->
+<!-- Date: 4/30/2019 -->
+
+<HTML lang="en">
+	<HEAD>
+		<META CHARSET="UTF-8">
+		<TITLE>Skeleton For JavaScript</TITLE>
+		<SCRIPT>
+			class main
+			{
+				constructor()
+				{
+				//Initialize program
+				}
+				classFunction()
+				{ //Classes can have different functions
+				}
+				HandleClick()
+				{
+					console.log("Inside Main's handle click")
+				}
+			}
+			function onClick()
+			{	//Call backs CANNOT go directly to classes, therefore you 
+				//must have a proxy function.
+				console.log("Inside global function handle click")
+				//Now Call my Main
+				myMain.HandleClick();
+			}
+		</SCRIPT>
+		</HEAD>
+	<BODY onclick="onClick();">
+		<HEADER><H1>Skeleton Project for JavaScript</H1></HEADER>
+		<SECTION id = "console"></SECTION>
+		<SCRIPT>
+			myMain = new main();
+			
+		</SCRIPT>
+	</BODY>
+</HTML>

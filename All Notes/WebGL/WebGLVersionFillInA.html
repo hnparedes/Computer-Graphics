@@ -1,0 +1,225 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+    <title>Interactive WebGL Triangles</title>
+    <style>
+        body 
+        {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f0f0f0;
+            color: white;
+            font-family: sans-serif;
+        }
+        canvas 
+        {
+            border: 2px solid #ccc;
+            background-color: black;
+            cursor: crosshair;
+        }
+        .controls 
+        { 
+            margin-bottom: 10px; 
+        }
+    </style>
+
+    <script id="2dVertexShader" type="notjs">
+        attribute vec4 a_position;
+        attribute vec3 a_color;
+        varying vec3 v_color;
+        void main() 
+        {
+            v_color = a_color;
+            gl_Position = a_position;
+            gl_PointSize = 7.0; 
+        }		
+    </script>
+
+    <script id="2dFragmentShader" type="notjs">
+        precision mediump float;
+        varying vec3 v_color;
+        void main() 
+        {
+            gl_FragColor = vec4(v_color, 1.0);
+        }
+    </script>
+
+    <script>
+        class InitWebGLProgram 
+        {
+            constructor(gl) 
+            {
+                this.gl = gl;
+                gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+                // Keep the green background logic
+                gl.clearColor(0.0, 1.0, 0.0, 1.0); 
+                gl.clear(gl.COLOR_BUFFER_BIT);
+            }
+
+            createShader(type, source) 
+            {
+                const shader = this.gl.createShader(type);
+                this.gl.shaderSource(shader, source);
+                this.gl.compileShader(shader);
+                if (this.gl.getShaderParameter(shader, this.gl.COMPILE_STATUS)) return shader;
+                console.error(this.gl.getShaderInfoLog(shader));
+                this.gl.deleteShader(shader);
+            }
+
+            createProgram(vs, fs) 
+            {
+                const program = this.gl.createProgram();
+                this.gl.attachShader(program, vs);
+                this.gl.attachShader(program, fs);
+                this.gl.linkProgram(program);
+                if (this.gl.getProgramParameter(program, this.gl.LINK_STATUS))
+                {
+
+                    return program;
+
+                }
+                console.error(this.gl.getProgramInfoLog(program));
+                this.gl.deleteProgram(program);
+            }
+        }
+
+        class Triangle 
+        {
+            constructor(gl) 
+            {
+                this.gl = gl;
+                this.positions = [];
+                this.vertCount = 0;
+                this.isFinished = false;
+                this.buffer = gl.createBuffer();
+            }
+
+            updateBuffer(tempX = null, tempY = null) 
+            {
+                let data = [...this.positions];
+                let count = this.vertCount;
+
+                // Add temporary point for mouse preview
+                if (tempX !== null && tempY !== null && !this.isFinished && this.vertCount > 0) 
+                {
+                    data.push(tempX, tempY, 1, 0, 0); // Red color
+                    count++;
+                }
+
+                this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.buffer);
+                this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(data), this.gl.DYNAMIC_DRAW);
+                return count;
+            }
+
+            addPoint(x, y) 
+            {
+                this.positions.push(x, y, 1, 0, 0); // Red color remains
+                this.vertCount++;
+                if (this.vertCount === 3) 
+                {
+                    this.isFinished = true;
+                }
+                this.updateBuffer();
+            }
+
+            render(program, tempX = null, tempY = null) 
+            {
+                const countToDraw = this.updateBuffer(tempX, tempY);
+                if (countToDraw === 0) 
+                {
+                    return;
+                }
+                const positionLoc = this.gl.getAttribLocation(program, "a_position");
+                const colorLoc = this.gl.getAttribLocation(program, "a_color");
+
+                this.gl.enableVertexAttribArray(positionLoc);
+                this.gl.enableVertexAttribArray(colorLoc);
+
+                // Stride of 20 bytes (5 floats * 4 bytes)
+                this.gl.vertexAttribPointer(positionLoc, 2, this.gl.FLOAT, false, 20, 0);
+                this.gl.vertexAttribPointer(colorLoc, 3, this.gl.FLOAT, false, 20, 8);
+
+                let mode = this.gl.POINTS;
+                if (this.isFinished) 
+                {
+                    mode = this.gl.TRIANGLES;
+                } 
+                else if (countToDraw > 1) 
+                {
+                    mode = this.gl.LINE_STRIP;
+                }
+                
+                this.gl.drawArrays(mode, 0, countToDraw);
+            }
+        }
+
+        class main 
+        {
+            constructor() 
+            {
+                this.canvas = document.getElementById("myCanvas");
+                this.gl = this.canvas.getContext("webgl");
+                const setup = new InitWebGLProgram(this.gl);
+
+                const vsSource = document.getElementById("2dVertexShader").text;
+                const fsSource = document.getElementById("2dFragmentShader").text;
+                const vs = setup.createShader(this.gl.VERTEX_SHADER, vsSource);
+                const fs = setup.createShader(this.gl.FRAGMENT_SHADER, fsSource);
+                
+                this.program = setup.createProgram(vs, fs);
+                this.gl.useProgram(this.program);
+
+                this.triangles = [];
+                this.currentTriangle = new Triangle(this.gl);
+                this.mouseX = 0;
+                this.mouseY = 0;
+
+                this.canvas.addEventListener("mousedown", (e) => this.onInput(e));
+                this.canvas.addEventListener("mousemove", (e) => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    this.mouseX = ((e.clientX - rect.left) / this.canvas.width) * 2 - 1;
+                    this.mouseY = ((e.clientY - rect.top) / this.canvas.height) * -2 + 1;
+                });
+
+                this.tick();
+            }
+
+            onInput(e) 
+            {
+                this.currentTriangle.addPoint(this.mouseX, this.mouseY);
+                if (this.currentTriangle.isFinished) 
+                {
+                    this.triangles.push(this.currentTriangle);
+                    this.currentTriangle = new Triangle(this.gl);
+                }
+            }
+
+            tick() 
+            {
+                this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+                for (let t of this.triangles)
+                {
+                     t.render(this.program);
+                }
+                this.currentTriangle.render(this.program, this.mouseX, this.mouseY);
+                requestAnimationFrame(() => this.tick());
+            }
+        }
+    </script>
+</head>
+<body>
+    <canvas id="myCanvas" width="640" height="400">
+        Your browser does not support canvas.
+    </canvas>
+
+    <script>
+        var canvas = document.getElementById("myCanvas");
+        var gl = canvas.getContext("webgl");
+        var m = new main();
+    </script>
+</body>
+</html>

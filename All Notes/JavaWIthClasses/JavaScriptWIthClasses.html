@@ -1,0 +1,75 @@
+<!-- This HTML file is written for academic purposes -->
+<!-- Author: Dr. Bradford A. Towle Jr. -->
+<!-- Date: 4/30/2019 -->
+
+<HTML lang="en">
+	<HEAD>
+		<META CHARSET="UTF-8">
+		<TITLE>JavaScript OOC</TITLE>
+		<!-- This is a comment in HTML -->
+		<!-- The Head will also contain all 
+				.css file imports
+				.js file Imports
+		-->
+		<script src="InheritanceClasses.js"></script>
+		<script>
+		//Classes are either declared here or imported as files
+		class Main
+		{
+			constructor()
+			{
+				// Any class variables must have 'this.' NOT var.
+				//By default all 
+				this.name = "Main"
+				this.Number = 100;
+			}
+			
+			//Functions in classes do not have the 'function' tag
+			//Function in classes CAN NOT BE USED FOR CALLBACKS!
+			GetMessage()
+			{
+				return this.name +","+this.Number;
+			}
+			
+			ReduceNumber()
+			{
+			this.Number --;
+			console.log("The number is now: "+this.Number);
+			}
+		
+		}
+		//Call backs MUST be global functions that are not part of a class.
+		//Therefore, all controls, buttons, or widgets will have to call back to
+		//a global function - which in turn will use the instance of main we created!
+		function ButtonCallBack()
+		{
+			//This will be okay as long as m has been defined 
+			//globally before we push the button.
+			m.ReduceNumber();
+		}
+		
+		</script>
+
+	</HEAD>
+	<BODY>
+		<HEADER>
+			<H1>JavaScript Classes</H1>			
+		</HEADER>
+		<button onclick="ButtonCallBack()">Reduce Number </button>
+		<Section ID="console" style="border: 2px solid #000;">
+		
+		</section>
+		<script>
+		//I want to minimize the number of global variables 
+		//So I will create ONE instance of the main class
+		//that will hold all of the program variables within it.
+		m = new Main();
+		console.log(m.GetMessage());
+		p = new Parent();
+		c = new Child();
+		p.PrintName();
+		c.PrintName();
+		</script>
+	</BODY>
+
+</HTML>

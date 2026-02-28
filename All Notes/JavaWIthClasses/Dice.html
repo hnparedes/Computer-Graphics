@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title> IntroToJavaScript </title>
+        <style>
+            body 
+            {
+
+                background-color: #1a1a1a;
+                color: white;
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                height: 100vh;
+                margin: 0;
+        
+            }
+            .dice-container
+            {
+
+                display: flex;
+                gap: 20px;
+                margin-bottom: 20px;
+
+            }
+            .dice-box
+            {
+
+                width: 100px;
+                height: 100px;
+                background-color: #f21c05;
+                border-radius: 15px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 3rem;
+                font-weight: bold;
+                box-shadow: 0 5px 15px rgba(0, 0, 0, 0, 5);
+                border: 4px solid white;
+
+            }
+            #message
+            {
+
+                font-size: 1.5rem;
+                height: 2rem;
+                margin-bottom: 20px;
+
+            }
+            .win-text
+            {
+
+                color: #ffd700;
+                font-weight: bold;
+                text-transform: uppercase;
+                animation: blink 0.5s infinite;
+
+            }
+            button
+            {
+
+                padding: 15px 30px;
+                font-size: 1.2rem;
+                cursor: pointer;
+                background-color: #228b22;
+                color: white;
+                border: none;
+                border-radius: 5px;
+
+            }
+            button:hover
+            {
+
+                background-color: #1e7a1e;
+
+            }
+            @keyframes blink
+            {
+
+                0%
+                {
+
+                    opacity: 1;
+
+                }
+                50%
+                {
+
+                    opacity: 0;
+
+                }
+                100%
+                {
+
+                    opacity: 1;
+
+                }
+
+            }
+        </style>
+    </head>
+    <body>
+
+        <h1> Dice Game </h1>
+
+        <div class="dice-container">
+            <div id="dice1Display" class="dice-box">?</div>
+            <div id="dice2Display" class="dice-box">?</div>
+        </div>
+
+        <div id="message"> Press To Roll</div>
+
+        <button onclick="playGame()"> Roll To Win </button>
+
+        <script>
+
+            // Class Called Dice
+            class Dice
+            {
+
+                constructor(sides)
+                {
+
+                    // Will have a number of sides
+                    this.sides = sides;
+                    // Will have the number last_rolled
+                    this.last_rolled = 0;
+
+                }
+
+                // Will have a function call "Roll"
+                Roll()
+                {
+
+                    // Will find a random number between [1 and number of sides]
+                    let result = Math.floor(Math.random() * this.sides) + 1;
+                    // Will set the last_rolled to that number
+                    this.last_rolled = result;
+                    // Will also return that number
+                    return result;
+
+                }
+
+            }
+
+            // Two instances of the dice object (with 20 sides)
+            const dice1 = new Dice(20);
+            const dice2 = new Dice(20);
+
+            function playGame()
+            {
+
+                const d1View = document.getElementById('dice1Display');
+                const d2View = document.getElementById('dice2Display');
+                const msgView = document.getElementById('message');
+            
+                let found = false;
+                let attempts = 0;
+
+                // Continuously roll the two dice until the two dice can be add, subtracted, divided or multiplied to make 10
+                while(!found)
+                {
+
+                    attempts++;
+                    let v1 = dice1.Roll();
+                    let v2 = dice2.Roll();
+
+                    // Check math conditions for 10
+                    if (
+                        v1 + v2 === 10 || 
+                        v1 - v2 === 10 || 
+                        v2 - v1 === 10 || 
+                        v1 * v2 === 10 || 
+                        v1 / v2 === 10 || 
+                        v2 / v1 === 10
+                        ) 
+                    {
+                        // Update UI
+                        d1View.innerText = v1;
+                        d2View.innerText = v2;
+                        msgView.innerHTML = `<span class="win-text">YOU WIN!</span> (Found in ${attempts} rolls)`;
+                    
+                        // Print the two dice values and print you win
+                        console.log(`Dice 1: ${v1}, Dice 2: ${v2}`);
+                        console.log("You win!");
+                    
+                        found = true;
+
+                    }
+                
+                }
+
+            }
+
+        </script>
+    </body>
+</html>

@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <title> Project 3 </title>
+
+    <style>
+
+        body 
+        {
+
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #2e2e2e;
+            color: white;
+
+        }
+        #gameBoard
+        {
+
+            border: 5px solid #f21c05;
+            background-color: #228B22;
+
+        }
+        .controls
+        {
+
+            margin-top: 10px;
+            width: 1152px;
+            text-align: center;
+
+        }
+        button
+        {
+
+            width: 60px;
+            height: 60px;
+            font-size: 24px;
+            cursor: pointer;
+            margin: 2px;
+
+        }
+
+    </style>
+
+    <script>
+        // Canvas body layout taken by Gemini
+
+        // Let data type used for variables to avoid reference errors
+        // and keep them scoped to their respective code blocks
+        // Part A
+        // 2D Array
+        const MAP = [
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1],
+            [1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 1],
+            [1, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 1],
+            [1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 1, 1],
+            [1, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1],
+            [1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        ];
+
+        // Part L
+        // Inherit Attributes / Parent Class
+        // Part J
+        // Properties
+        class Attributes
+        {
+
+            // Part J
+            constructor(hp, atk, def, x, y, imgSrc)
+            {
+
+
+                this.HP = hp;
+                this.MHP = hp;
+                this.ATK = atk;
+                this.DEF = def;
+                this.X = x;
+                this.Y = y;
+                this.Img = new Image()
+                this.Img.src = imgSrc;
+
+            }
+
+            // Part M
+            // Damage Logic Damage = (other.ATK-this.DEF or 1 whichever is higher) * random number 1-6
+            takeDamage(attackerATK)
+            {
+
+                let base = Math.max(1, attackerATK - this.DEF);
+                let roll = Math.floor(Math.random() * 6) + 1;
+                let final = base * roll;
+                this.HP = Math.max(0, this.HP - final);
+                return final;
+
+            }
+
+            // Part K
+            // Health Bars
+            // Part L
+            // Render Function
+            render(tileSize)
+            {
+
+                let px = this.X * tileSize;
+                let py = this.Y * tileSize;
+                ctx.drawImage(this.Img, px, py, tileSize, tileSize);
+
+                let ratio = this.HP / this.MHP;
+                ctx.fillStyle = "red";
+                ctx.fillRect(px + 7, py - 10, 50, 6);
+                ctx.fillStyle = "#0F0";
+                ctx.fillRect(px + 7, py - 10, 50 * ratio, 6);
+
+            }
+        
+        }
+
+        // Part L
+        // Class Hero Inherit Attributes
+        class Hero extends Attributes
+        {
+
+            constructor()
+            {
+
+                super(250, 15, 25, 8, 4, "Hero.png");
+
+            }
+
+        }
+
+        // Part L
+        // Class Monster Inherit Attributes
+        class Monster extends Attributes
+        {
+
+            constructor(hp, atk, def, x, y, img, type)
+            {
+
+                super(hp, atk, def, x, y, img);
+                this.type = type;
+
+            }
+
+        }
+
+        // Main
+        class main 
+        {
+
+            // Constructor
+            constructor()
+            {
+                
+                // Part A
+                // Tile Size
+                this.tileSize = 64;
+                this.gameOver = false;
+                this.gameWin = false;
+                this.hero = new Hero()
+
+                // Part H
+                // Potions On Map
+                this.potionImg = new Image();
+                this.potionImg.src = "potion.png";
+                this.potions = [{x: 3, y: 6}, {x: 15, y: 6}, {x: 7, y: 1}];
+
+                // Bricks On Map
+                this.brickImg = new Image();
+                this.brickImg.src = "brick.png";
+
+                // Part N/J
+                // Three Monster Difficulties
+                this.monsters = [
+                    new Monster(100, 25, 5, 2, 5, "imp.png", "Imp"),
+                    new Monster(125, 30, 10, 15, 1, "demon.png", "Demon"),
+                    new Monster(150, 40, 15, 12, 6, "devil.png", "Devil")
+                ];
+
+                // Tick Function
+                setInterval(Interval, 1000)
+                this.renderMap();
+    
+            }
+
+            // Update Function
+            update(dx, dy)
+            {
+
+                if(this.gameOver || this.gameWin)
+                {
+
+                    return;
+
+                }
+                else
+                {
+
+                    // Part D/G
+                    // Calculate Movement
+                    let nx = this.hero.X + dx;
+                    let ny = this.hero.Y + dy;
+
+                    // Part E
+                    // Check Monster Position
+                    let mIdx = this.getMonsterPosition(nx, ny);
+
+                    if(mIdx != -1)
+                    {
+
+                        // Part E
+                        // Attack And No Movement
+                        let m = this.monsters[mIdx];
+                        m.takeDamage(this.hero.ATK);
+                        if(m.HP <= 0)
+                        {
+                        
+                            this.monsters.splice(mIdx, 1);
+
+                        }
+
+                        // Check Win
+                        if(this.monsters.length == 0)
+                        {
+
+                            this.gameWin = true;
+
+                        }
+
+                    }
+
+                    // Part G
+                    // Check Surroundings
+                    else if(MAP[ny][nx] == 0)
+                    {
+
+                        this.hero.X = nx;
+                        this.hero.Y = ny;
+
+                        // Part H
+                        // Check Potions
+                        this.PotionHeal();
+
+                    }
+
+                    this.renderMap()
+
+                }
+            
+            }
+
+            // Part F
+            // Monster Movements Function
+            MonsterMovements(m)
+            {
+
+                let directs = [{x: 0, y: -1}, {x: 0, y: 1}, {x: -1, y: 0}, {x: 1, y: 0}];
+                let move = directs[Math.floor(Math.random() * 4)];
+                let tx = m.X + move.x;
+                let ty = m.Y + move.y;
+
+                // Part F
+                // Check Monster Movements
+                if(tx == this.hero.X && ty == this.hero.Y)
+                {
+
+                    this.hero.takeDamage(m.ATK);
+                    // Check Lose
+                    if(this.hero.HP <= 0)
+                    {
+
+                        this.gameOver = true;
+
+                    }
+
+                }
+                // Part G
+                // Monsters Surroundings
+                else if(MAP[ty][tx] == 0 && this.getMonsterPosition(tx, ty) == -1)
+                {
+
+                    m.X = tx;
+                    m.Y = ty;
+
+                }
+
+            }
+
+            // Render Map Function
+            renderMap()
+            {
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                // Part B
+                // Draw Map
+                for(let r = 0; r < MAP.length; r++)
+                {
+
+                    for(let c = 0; c < MAP[r].length; c++)
+                    {
+
+                        let x = c * 64;
+                        let y = r * 64;
+                        // Draw Bricks
+                        if(MAP[r][c] == 1)
+                        {
+
+                            ctx.drawImage(this.brickImg, x, y, 64, 64)
+
+                        }
+                        // Draw Trees
+                        else if(MAP[r][c] == 2)
+                        {
+
+                            this.makeTree(x, y);
+
+                        }
+                        // Draw Path
+                        else
+                        {
+                          
+                            ctx.fillStyle = "#228B22";
+                            ctx.fillRect(x, y, 64, 64);
+
+                        }
+
+                    }
+
+                }
+
+                // Part H
+                // Make Potions
+                this.potions.forEach(p => {
+                    ctx.drawImage(this.potionImg, p.x * 64 + 16, p.y * 64 + 16, 32, 32);
+                });
+
+                // Part C/L
+                this.hero.render(64);
+                this.monsters.forEach(m => m.render(64));
+
+                // Print Win/Loss
+                // Canvas Width Dynamic Fixed By Gemini
+                ctx.font = "bold 60px Arial";
+                if(this.gameOver)
+                {
+
+                    ctx.fillStyle = "red";
+                    ctx.fillText("Game Over", canvas.width / 2, canvas.height / 2);
+
+                }
+                if(this.gameWin)
+                {
+
+                    ctx.fillStyle = "gold";
+                    ctx.fillText("YOU WIN", canvas.width / 2, canvas.height / 2);
+
+                }
+
+            }
+
+            // Make Tree Function
+            makeTree(x, y)
+            {
+
+                ctx.fillStyle = "#228B22"; 
+                ctx.fillRect(x, y, 64, 64);
+
+                ctx.fillStyle = "#8B4513";
+                ctx.fillRect(x + 24, y + 40, 16, 20)
+
+                ctx.fillStyle = "#004400";
+                ctx.beginPath();
+                ctx.arc(x + 32, y + 25, 20, 0, Math.PI * 2);
+                ctx.fill();
+
+            }
+
+            // Part H
+            // Potion Healing Function
+            PotionHeal()
+            {
+
+                let pIdx = this.potions.findIndex(p => p.x == this.hero.X && p.y == this.hero.Y);
+                if (pIdx != -1)
+                {
+
+                    this.hero.HP = Math.min(this.hero.MHP, this.hero.HP + 50);
+                    this.potions.splice(pIdx, 1);
+
+                }
+
+            }
+
+            // Part F
+            // Monster Intervals Function
+            MonsterIntervals()
+            {
+
+                if(this.gameOver || this.gameWin)
+                {
+
+                    return;
+
+                }
+                this.monsters.forEach(m => this.MonsterMovements(m));
+                this.renderMap();
+
+            }
+
+            // Get Monster Location Function
+            getMonsterPosition(x, y)
+            {
+
+                return this.monsters.findIndex(m => m.X == x && m.Y == y);
+
+            }
+
+        }
+
+        // Global Variables
+        var canvas, ctx, myMain;
+
+        function Interval()
+        {
+
+            myMain.MonsterIntervals();
+
+        }
+
+        // Part D
+        // Buttons
+        function moveUP()
+        {
+
+            myMain.update(0, -1);
+
+        }
+        function moveDOWN()
+        {
+
+            myMain.update(0, 1);
+
+        }
+        function moveLEFT()
+        {
+
+            myMain.update(-1, 0);
+
+        }
+        function moveRIGHT()
+        {
+
+            myMain.update(1, 0);
+
+        }
+
+    </script>
+
+</head>
+
+<body>
+    <HEADER><H1> Hero V. Monsters </H1></HEADER>
+    <canvas id="gameBoard" width="1152" height="512"></canvas>
+
+    <div class="controls">
+        <button onclick="moveUP()"> &uparrow; </button><br>
+        <button onclick="moveLEFT()"> &leftarrow; </button>
+        <button onclick="moveRIGHT()"> &rightarrow; </button><br>
+        <button onclick="moveDOWN()"> &downarrow; </button>
+    </div>
+
+    <script>
+
+        canvas = document.getElementById("gameBoard");
+        ctx = canvas.getContext("2d");
+        ctx.textAlign = "center";
+        myMain = new main();
+
+    </script>
+
+</body>
+</html>

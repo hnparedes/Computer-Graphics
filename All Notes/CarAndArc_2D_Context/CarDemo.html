@@ -1,0 +1,96 @@
+<!DOCTYPE HTML>
+<HTML lang="en">
+	<HEAD>
+		<Title>"Welcome TO JAVA SCRIPT"</TITLE>
+		
+		<!-- All JavaScript classes should have their own .js file -->
+		<script src="car.js"></script>
+		
+		<!-- helper functions go here -->
+		
+		<!-- Main Class -->
+		<Script>
+		class mainC
+		{
+			constructor()
+			{
+				
+				this.drawArc();
+				//this.c = new Car();
+				//setInterval(Function,MilliSeconds)
+				//setInterval(Paint_Scene,100);
+			}
+			
+			updateAll()
+			{
+				//This function will update all of the different objects
+				//In this case just this.c
+				this.c.update()
+			}
+			
+			renderAll()
+			{
+				//This function will render all of the objects in the scene
+				//In this case just this.c
+				this.c.render();
+			}
+			drawArc()
+			{
+				ctx.beginPath();
+				ctx.lineJoin = "miter";
+				ctx.lineWidth = 5;
+				ctx.strokeStyle = "#F00";
+				//CTX.arc(x,y,Radius, Start angle <Rad>, End angle <Rad>,counter-clockwise?)
+				ctx.arc(25,50,25,0,90*Math.PI/180,false); //Clockwise
+				ctx.stroke();
+				ctx.beginPath();
+				ctx.arc(100,50,25,0,90*Math.PI/180,true); //Counter Clockwise
+				ctx.stroke();
+				ctx.beginPath();
+				ctx.strokeStyle="#0F0";
+				ctx.arc(50,100,25,0,Math.PI,true);
+				ctx.stroke();
+				ctx.beginPath();
+				ctx.strokeStyle="#00F";
+				ctx.arc(100,100,25,0,Math.PI*1.5,false);//270 degrees
+				ctx.stroke();
+			}
+		}
+		//This has to be a global variable because
+		//the interval timer is calling back to it.
+		function Paint_Scene()
+			{
+			//drawing a background - in this case white
+				ctx.clearRect(0,0,640,400);
+			//I will update my object
+				myMain.updateAll();
+			//Re-render
+				myMain.renderAll();
+			}
+		</SCRIPT>
+	</HEAD>
+	
+	<BODY>
+		<HEADER>
+		
+		</HEADER>
+		
+		<CANVAS id="myCanvas" width="640" height="400">
+			Your browser does not support canvas.
+		</CANVAS>
+
+		<FOOTER>
+		
+		</FOOTER>
+		<SCRIPT>
+			var canvas = document.getElementById("myCanvas");
+			var ctx = canvas.getContext("2d");	
+			
+			myMain = new mainC();
+		</SCRIPT>
+		
+	</BODY>
+	
+</HTML>
+		
+		

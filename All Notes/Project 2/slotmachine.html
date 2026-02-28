@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<HTML lang="en">
+    <HEAD>
+        <META CHARSET="UTF-8">
+            <TITLE> Project 2 </TITLE>
+            <SCRIPT>
+
+                class main
+                {
+
+                    // Initializes the base money, output section, and slotmachine array with multiple instances
+                    constructor()
+                    {
+
+                        // B.a.
+                        this.money = 100;
+                        this.slotmachines = [];
+
+                        // B.b.
+                        this.outputSection = document.createElement("section");
+                        document.body.appendChild(this.outputSection);
+
+                        // E.
+                        for(var i = 0; i < 3; i++)
+                        {
+
+                            // B.c.
+                            this.slotmachines.push(new SlotMachine());
+                            // New lines / single row logic error found and corrected by ChatGPT
+                            var newRow = document.createElement("br");
+                            document.body.appendChild(newRow)
+
+                        }
+
+                    }
+
+                    // B.d.
+                    // Handles the winning conditions, triggers the slot machines' randomization, 
+                    // calculates total amount, and updates slot machine number displays
+                    PlayAll()
+                        {
+
+                            // B.e.
+                            if(this.money > 0)
+                            {
+
+                                this.money -= 1;
+                                var sumAmountWon = 0;
+
+                                for(var i = 0; i < this.slotmachines.length; i++)
+                                {
+
+                                    this.slotmachines[i].play();
+                                    // B.f.
+                                    sumAmountWon += this.slotmachines[i].lastAmountWon;
+
+                                }
+
+                                // B.g.
+                                // Must be placed before winning amount condition to prevent logic error
+                                this.money += sumAmountWon;
+
+                                // B.f.
+                                if(sumAmountWon > 0)
+                                {
+
+                                    this.outputSection.innerHTML = "Winning Amount: " + sumAmountWon + "<br>Amount Won: " + this.money;
+
+                                }
+                                else
+                                {
+
+                                    this.outputSection.innerHTML = "Game Over!<br>Amount Won: " + this.money;
+
+                                }
+
+                            }
+                            else
+                            {
+
+                                this.outputSection.innerHTML = "Out Of Buck, Out Of Luck: " + this.money;
+
+                            }
+
+                        }
+
+                }
+
+                class SlotMachine
+                {
+                    
+                    // Makes each individual slot machine instance, 
+                    // initializes base slot machine variables, and creates 3 images
+                    constructor()
+                    {
+
+                        // C.a.
+                        this.lastAmountWon = 0;
+                        this.numbers = [0, 0, 0];
+                        this.images = [];
+
+                        for(var i = 0; i < 3; i++)
+                        {
+
+                            // C.b.
+                            // Images must be variables to generate independent instances
+                            var Img = new Image();
+                            Img.width = "64";
+                            Img.height = "64";
+                            Img.src = "attract.png";
+                            Img.alt = " ? ";
+                            document.body.appendChild(Img);
+                            this.images.push(Img);
+
+                        }
+
+                    }
+
+                    // Starts the machines by picking random numbers,
+                    // ranging from 0 to 6, updates images based on numbers,
+                    // and returns the correct amount based on conditions
+                    play()
+                    {
+
+                        for(var i = 0; i < 3; i++)
+                        {
+
+                            // C.c.
+                            // Must be floor NOT ceil, or it will pull images 1-7
+                            this.numbers[i] = Math.floor(Math.random() * 7);
+                            this.images[i].src = "number" + this.numbers[i] + ".png";
+                            this.images[i].alt = "Number " + this.numbers[i];
+
+                        }
+
+                        var n1 = this.numbers[0];
+                        var n2 = this.numbers[1];
+                        var n3 = this.numbers[2];
+
+                        // C.c
+                        // Amount won table conditions (arranged from top to bottom)
+                        if(n1 == 0 && n2 == 0 && n3 == 0)
+                        {
+
+                            this.lastAmountWon = 14;
+
+                        }
+                        else if(n1 != 0 && n1 == n2 && n2 == n3)
+                        {
+
+                            this.lastAmountWon = 7;
+
+                        }
+                        else if(n1 == 0 && n2 == 0)
+                        {
+
+                            this.lastAmountWon = 3;
+
+                        }
+                        else if(n1 != 0 && n1 == n2)
+                        {
+
+                            this.lastAmountWon = 2;
+
+                        }
+                        else if(n1 == 0)
+                        {
+
+                            this.lastAmountWon = 1;
+
+                        }
+                        else
+                        {
+
+                            this.lastAmountWon = 0;
+
+                        }
+
+                    }
+
+                }
+
+                // D.
+                function OnClick()
+                {
+
+                    myMain.PlayAll();
+
+                }
+
+            </SCRIPT>
+    </HEAD>
+    <BODY>
+        <HEADER><H1> Slot Machine </H1></HEADER>
+        <button onclick="OnClick()"> Play </button>
+        <br><br>
+        <SCRIPT>
+            // Only global variable
+            myMain = new main();
+        </SCRIPT>
+    </BODY>
+</HTML>

@@ -1,0 +1,200 @@
+<!DOCTYPE HTML>
+<HTML lang="en">
+	<HEAD>
+		<Title>"Welcome TO JAVA SCRIPT"</TITLE>
+		
+		<!-- Class Files -->
+		<!--<script src="Name of JS FILE"></script>-->
+
+		</SCRIPT>
+		<!-- main Class -->
+		<SCRIPT>
+			class Main
+			{
+				constructor()
+				{
+					this.drawLine();
+					this.rectangle();
+					this.StrokeAndFill();
+					this.drawPictures();
+				}
+		
+				setLineColor(c)
+				{
+					ctx.strokeStyle = c;
+				}
+				
+				setFillColor(c)
+				{
+				
+					ctx.fillStyle = c;
+				}
+				
+				setLineWidth(s)
+				{
+					ctx.lineWidth = s;
+				}
+				setLineCap(c)
+				{
+					switch(c)
+					{
+						case 0: 
+								ctx.lineCap = "butt";
+								break;
+						case 1:
+								ctx.lineCap = "round";
+								break;
+						case 2:
+								ctx.lineCap = "square";
+								break;
+						default:
+								break;
+					}
+				}
+				setLineJoin(c)
+				{
+					switch(c)
+					{
+						case 0: 
+								ctx.lineJoin = "miter";
+								break;
+						case 1:
+								ctx.lineJoin = "round";
+								break;
+						case 2:
+								ctx.lineJoin = "bevel";
+								break;
+						default:
+								break;
+					}
+				}
+				drawLine()
+				{
+					//Demonstrate different line caps
+					this.setLineWidth(1);
+					this.setLineColor("#F00");
+					this.setLineCap(0); //BUTT
+					
+					ctx.beginPath();
+					ctx.moveTo(5,50);
+					ctx.lineTo(5,100);
+					ctx.stroke();
+					
+					ctx.beginPath();
+					this.setLineColor("#0F0");
+					this.setLineCap(1); //ROUND
+					ctx.moveTo(50,50);
+					ctx.lineTo(50,100);
+					ctx.stroke();
+					
+					ctx.beginPath();
+					this.setLineColor("#00F");
+					this.setLineCap(2); //sQUARE
+					ctx.moveTo(100,50);
+					ctx.lineTo(100,100);
+					ctx.stroke();
+					
+					//Demonstrate different Line Joins.
+					ctx.beginPath();
+					ctx.moveTo(5,150);
+					this.setLineJoin(0); //miter
+					ctx.lineTo(5,200);
+					ctx.lineTo(25,200);
+					ctx.stroke();
+					
+					this.setLineJoin(1); //round
+					
+					ctx.beginPath();
+					ctx.moveTo(50,150);
+					ctx.lineTo(50,200);
+					ctx.lineTo(75,200);
+					ctx.stroke();
+					
+					ctx.beginPath();
+					ctx.moveTo(100,150);
+					this.setLineJoin(2); //bevel
+					ctx.lineTo(100,200);
+					ctx.lineTo(125,200);
+					ctx.stroke();
+				}
+				
+				rectangle()
+				{
+					this.setFillColor("#88F");
+					//Parematers are x,y, width and height
+					ctx.fillRect(5,210,50,50);
+					this.setLineColor("#000");
+					ctx.strokeRect(5,270,40,40);
+					//For Both fill and outline
+					ctx.strokeRect(5,320,50,50);
+					ctx.fillRect(5,320,50,50);
+
+					
+					//Notice the line and join have the same parameters as the last 
+					//Parameter set in Draw Line
+					
+	
+				}	
+				StrokeAndFill()
+				{
+					this.setLineWidth(1);
+					this.setFillColor("#0F0");
+					this.setLineCap(0); //BUTT
+					ctx.beginPath();
+					ctx.moveTo(200,150);
+					ctx.lineTo(230,200);
+					ctx.lineTo(200,250);
+					ctx.lineTo(170,250);
+					ctx.lineTo(140,200);
+					ctx.lineTo(170,150);
+					ctx.fill();
+					ctx.stroke();
+				}
+				drawPictures()
+				{
+					//In order to draw the image, you wil need
+					//to make sure hte html image has loaded first!
+					//They will not always appear the first time due to a loading
+					//race condition.
+					var pic = document.getElementById("slime");
+					ctx.drawImage(pic,200,0);
+					ctx.drawImage(pic,400,75,100,100);	
+				}
+			}
+			function onClick()
+			{
+				m.drawPictures();
+			}
+		</SCRIPT>
+	</HEAD>
+	<BODY>
+		<HEADER></HEADER>
+		<H1>Canvas Tutorial</H1>
+		<!--style="display:none;"-->
+		<IMG src="img/slime.png" alt="slime"  id="slime"/>
+		
+		<SECTION id="Canvas">
+		
+			<CANVAS width=640 height=480 id="myCanvas" style="border: 1px solid black;" onclick="onClick();">
+				Your Web-Browser does not support Canvase
+			</CANVAS>
+			
+		</SECTION>
+		<!-- call our JavaScript at the end so all html elements are initialized -->
+		<SCRIPT>
+			//This is JavaScript
+			//This is a variable pointing at an HTML element...For this class we will allow it.			
+			
+			//This is the JavaScript variable pointing at the canvas.
+			var canvas = document.getElementById("myCanvas");
+			
+			//This is 2D drawing context for canvas	
+			var ctx = canvas.getContext("2d");		
+			m = new Main();//Invoke main to start the program.
+	
+		</SCRIPT>
+	</BODY>
+</HTML>
+
+
+

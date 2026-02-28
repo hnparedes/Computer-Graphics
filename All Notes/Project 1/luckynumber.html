@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<HTML lang="en">
+    <HEAD>
+        <META CHARSET="UTF-8">
+        <TITLE> Project 1 </TITLE>
+        <SCRIPT>
+            class main
+            {
+
+                constructor()
+                {
+
+                    this.wins = 0;
+                    this.losses = 0;
+
+                    this.consoleSection = document.getElementById("console");
+                    
+                    this.myImg = new Image();
+                    this.myImg.src = "default.jpg";
+                    this.myImg.width = "64";
+                    this.myImg.height = "64";
+
+                }
+
+                game()
+                {
+
+                    var num1 = Math.ceil(Math.random() * 100) + 1;
+                    var num2 = Math.ceil(Math.random() * 100) + 1;
+                    var output = "<br>Numbers: " + num1 + " and " + num2 + "\n";
+
+                    if(num2 > num1)
+                    {
+
+                        this.wins += 1;
+                        if(this.wins > this.losses)
+                        {   
+                            output += "<br>You Win!<br>Wins: " + this.wins + "<br>Losses: " + this.losses;
+                            this.consoleSection.innerHTML = output
+                        }
+                        else if(this.wins == this.losses)
+                        {
+                            output += "<br>It's A Draw...<br>Wins: " + this.wins + "<br>Losses: " + this.losses;
+                            this.consoleSection.innerHTML = output
+                        }
+                        else
+                        {
+                            output += "<br>You Lose!<br>Wins: " + this.wins + "<br>Losses: " + this.losses;
+                            this.consoleSection.innerHTML = output
+                        }
+
+                    }
+                    else
+                    {
+
+                        this.losses += 1;
+                        if(this.losses > this.wins)
+                        {
+                            output += "<br>You Lose!<br>Wins: " + this.wins + "<br>Losses: " + this.losses;
+                            this.consoleSection.innerHTML = output
+                        }
+                        else if(this.losses == this.wins)
+                        {
+                            output += "<br>It's A Draw...<br>Wins: " + this.wins + "<br>Losses: " + this.losses;
+                            this.consoleSection.innerHTML = output
+                        }
+                        else
+                        {
+                            output += "<br>You Win!<br>Wins: " + this.wins + "<br>Losses: " + this.losses;
+                            this.consoleSection.innerHTML = output
+                        }
+
+                    }
+
+                    console.log("Numbers: " + num1 + " and " + num2);
+                    console.log("Wins: " + this.wins + " Losses: " + this.losses);
+
+                    if(this.wins > this.losses)
+                    {
+
+                        this.myImg.src = "happy.jpg";
+                        document.body.appendChild(this.myImg)
+
+                    }
+                    else if(this.wins == this.losses)
+                    {
+
+                        this.myImg.src = "default.jpg";
+                        document.body.appendChild(this.myImg)
+
+                    }
+                    else
+                    {
+
+                        this.myImg.src = "sad.jpg";
+                        document.body.appendChild(this.myImg)
+
+                    }
+
+                }
+                
+            }
+
+            function OnClick()
+            {
+
+                console.log("Inside global function handle click");
+                myMain.game();
+
+            }
+        </SCRIPT>
+    </HEAD>
+    <BODY>
+        <HEADER><H1> Lucky Number Game </H1></HEADER>
+        <button onclick="OnClick()"> Play Game </button>
+        <SECTION id = "console"></SECTION>
+        <SCRIPT>
+            myMain = new main();
+        </SCRIPT>
+    </BODY>
+</HTML>
