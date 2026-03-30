@@ -1,0 +1,771 @@
+<!DOCTYPE HTML>
+<HTML lang="en">
+	<Head>
+	<Title> Modularizing WebGL </TITLE>
+		
+		<script id="2dVertexShader" type="notjs">
+		attribute vec4 a_position;	
+		//We now want to read in Colors
+		attribute vec3 vert_color;
+		//However, we want to send the color to
+		//The fragment Shader
+		varying vec3 fragColor;
+
+		// Add uniforms to recieve data from JS
+		uniform vec3 transform;
+		uniform vec3 rotation;
+		void main()
+		{
+			vec4 newPosition = a_position;
+			newPosition.xyz += transform;
+
+			fragColor = vert_color;
+			gl_Position = newPosition;
+		}		
+		</SCRIPT>
+		<script id="2dFragmentShader" type="notjs">
+		//Fragment shaders do not have precision so we have to set it.
+		precision mediump float;
+		varying vec3 fragColor;
+		void main()
+		{
+			//gl_FragColor = vec4(0,0,1,1); //Between 0 and 1.
+			gl_FragColor = vec4(fragColor,1);
+		}
+		</script>
+
+		<script>
+		// --- From webgl_interface.js ---
+		class WebGL_Interface
+		{
+			constructor()
+			{
+
+				this.canvas = document.getElementById("myCanvas");
+				window.gl = this.canvas.getContext("webgl");
+				if(!gl)
+				{
+					console.error("WebGL not supported");
+					window.gl = this.canvas.getContext("experimental-webgl");
+				}
+
+				if(!gl)
+				{
+					alert("Your browser does not support WebGL");
+					return;
+				}
+
+				this.vertexShaderSource = document.getElementById("2dVertexShader").text;
+				this.fragmentShaderSource = document.getElementById("2dFragmentShader").text;
+				this.vertexShader = this.createShader(gl.VERTEX_SHADER, this.vertexShaderSource);
+				this.fragmenShader = this.createShader(gl.FRAGMENT_SHADER, this.fragmentShaderSource);
+				//Link to program
+				this.program = this.createProgram(this.vertexShader,this.fragmenShader);
+				//setup our viewport
+				gl.viewport(0,0, gl.canvas.width, gl.canvas.height);
+				//set clear colors
+				gl.clearColor(1,1,1,1);
+				gl.clear(gl.COLOR_BUFFER_BIT);		
+				//what progbram to use;
+				
+				//We will need this for now!
+				gl.enable(gl.DEPTH_TEST);
+				
+				gl.useProgram(this.program);
+			}
+			
+			createShader(type,source)
+			{
+				var shader = gl.createShader(type);
+				gl.shaderSource(shader,source);
+				gl.compileShader(shader);
+				var success = gl.getShaderParameter(shader,gl.COMPILE_STATUS);
+				if(success)
+				{
+					return shader;
+				}
+				//Else it didn't work
+				console.error(gl.getShaderInfoLog(shader));
+				gl.deleteShader(shader);
+			}
+			
+			createProgram(vs,fs)
+			{
+				var program = gl.createProgram();
+				gl.attachShader(program,vs);
+				gl.attachShader(program,fs);
+				gl.linkProgram(program);
+				var succsess = gl.getProgramParameter(program,gl.LINK_STATUS);
+				if(succsess)
+				{
+					return program;
+				}
+				console.error(gl.getProgramInfoLog(program));
+				gl.deleteProgram(program);	
+			}
+		}
+
+		// --- From BasicGameObjectFillIn.js ---
+		class Transform
+		{
+			constructor()
+			{
+				this.forward = [0,0,1];
+				this.right = [1,0,0];
+				this.up = [0,1,0];
+			}
+				
+			doRotations(RotAngles)
+			{
+				this.xRot = [
+							[1,0,0,0],
+							[0,Math.cos(RotAngles[0]),-1*Math.sin(RotAngles[0]),0],
+							[0,Math.sin(RotAngles[0]),Math.cos(RotAngles[0]),0],
+							[0,0,0,1]
+							];		
+				this.yRot = [
+							[Math.cos(RotAngles[1]),0,Math.sin(RotAngles[1]),0],
+							[0,1,0,0],
+							[-1*Math.sin(RotAngles[1]),0,Math.cos(RotAngles[1]),0],
+							[0,0,0,1]	
+							];
+				this.zRot = [
+							[Math.cos(RotAngles[2]),-1*Math.sin(RotAngles[2]),0,0],
+							[Math.sin(RotAngles[2]),Math.cos(RotAngles[2]),0,0],
+							[0,0,1,0],
+							[0,0,0,1]
+							];
+				//this.forward = this.crossMultiply(xRot,[0,0,1,0]);		
+				this.forward = this.crossMultiply(this.zRot,this.crossMultiply(this.yRot,this.crossMultiply(this.xRot,[0,0,1,0])))
+				this.right = this.crossMultiply(this.zRot,this.crossMultiply(this.yRot,this.crossMultiply(this.xRot,[1,0,0,0])))
+				this.up = this.crossMultiply(this.zRot,this.crossMultiply(this.yRot,this.crossMultiply(this.xRot,[0,1,0,0])))
+			}			
+			crossMultiply(M,V)
+			{
+				// Commenting out the console logs to prevent console spam
+				// console.log(M[0][3]);
+				// console.log(V[3]);
+				var temp = [
+						M[0][0]*V[0]+M[0][1]*V[1]+M[0][2] * V[2]+ M[0][3]*V[3],
+						M[1][0]*V[0]+M[1][1]*V[1]+M[1][2] * V[2]+ M[1][3]*V[3],
+						M[2][0]*V[0]+M[2][1]*V[1]+M[2][2] * V[2]+ M[2][3]*V[3],
+						M[3][0]*V[0]+M[3][1]*V[1]+M[3][2] * V[2]+ M[3][3]*V[3]
+						];
+				// console.log(temp);
+				return temp;
+			}
+		}
+				
+		class GameObject
+		{
+			constructor() 
+			{
+				this.loc = [0,0,0];
+				this.rot = [0,0,0];
+				this.isTrigger = false;
+				this.collissionRadius = 0.1;
+				this.velocity = [0,0,0];
+				this.angVelocity = [0,0,0];
+				this.name = "default";
+				this.id = 0;
+				this.prefab;
+				this.transform = new Transform();
+			}
+
+			Move()
+			{
+
+				var tempP = [0,0,0];
+				for(var i = 0; i < 3; i++)
+				{
+
+					tempP[i] = this.loc[i];
+					tempP[i] += this.velocity[i];
+					this.rot[i] += this.angVelocity[i];
+
+				}
+
+				if(!this.isTrigger)
+				{
+
+					var clear = true;
+					for(var so in m.Trigger)
+					{
+
+						if(m.CheckCollision(tempP, this.collissionRadius, m.Trigger[so].loc, m.Trigger[so].collissionRadius))
+						{
+
+							this.OnTriggerEnter(m.Trigger[so]);
+							try
+							{
+
+								m.Trigger[so].OnTriggerEnter(this);
+
+							}
+							catch(error)
+							{
+
+
+
+							}
+
+							break;
+
+						}
+
+					}
+
+					for(var so in m.Solid)
+					{
+
+						if(m.CheckCollision(tempP, this.collissionRadius, m.Solid[so].loc, m.Solid[so].collissionRadius))
+						{
+
+							this.OnCollisionEnter(m.Solid[so]);
+							try
+							{
+
+								m.Solid[so].OnCollisionEnter(this);
+
+							}
+							catch(error)
+							{
+
+
+
+							}
+
+						}
+
+					}
+
+					if(clear)
+					{
+
+						this.loc = tempP;
+
+					}
+
+				}
+				else
+				{
+
+					this.loc = tempP;
+					for(var so in m.Solid)
+					{
+
+						if(m.CheckCollision(tempP, this.collissionRadius, m.Solid[so].loc, m.Solid[so].collissionRadius))
+						{
+
+							this.OnCollisionEnter(m.Solid[so]);
+							try
+							{
+
+								m.Solid[so].OnCollisionEnter(this);
+
+							}
+							catch(error)
+							{
+
+
+
+							}
+
+						}
+
+					}
+
+					if(clear)
+					{
+
+						this.loc = tempP;
+
+					}
+
+				}
+
+			}
+			
+			Update()
+			{
+				this.velocity = [0,0,0];
+				this.angVelocity = [0,0,0];
+
+				if(m.CheckKey("A"))
+				{
+
+					this.velocity[0] = -0.001;
+				
+				}
+
+				if(m.CheckKey("D"))
+				{
+
+					this.velocity[0] = 0.001;
+						
+				}
+
+				if(m.CheckKey("W"))
+				{
+
+					for(let i = 0; i < 3; i++)
+					{
+
+						this.velocity[i] = 0.001 * this.transform.up[i];
+
+					}
+
+				}
+
+				if(m.CheckKey("S"))
+				{
+
+					for(let i = 0; i < 3; i++)
+					{
+
+						this.velocity[i] = -0.001 * this.transform.up[i];
+
+					}
+
+				}
+
+				this.transform.doRotations(this.rot);
+
+				this.Move();
+			}
+
+			Render(program)
+			{
+				gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+
+				var positionAttribLocation = gl.getAttribLocation(program, 'a_position');
+				gl.enableVertexAttribArray(positionAttribLocation);
+				gl.vertexAttribPointer(positionAttribLocation, 3, gl.FLOAT, false, 6 * 4, 0);
+
+				var colorAttribLocation = gl.getAttribLocation(program, 'vert_color');
+				gl.enableVertexAttribArray(colorAttribLocation);
+				gl.vertexAttribPointer(colorAttribLocation, 3, gl.FLOAT, false, 6 * 4, 3 * 4);
+
+				var tranLoc  = gl.getUniformLocation(program,'transform');
+				gl.uniform3fv(tranLoc,new Float32Array(this.loc));
+
+				var rotLoc = gl.getUniformLocation(program,'rotation');
+				gl.uniform3fv(rotLoc,new Float32Array(this.rot));
+				
+				var count = this.vertices.length / 6;
+				gl.drawArrays(gl.TRIANGLES, 0, count);
+			}
+
+			OnCollisionEnter(other)
+			{
+
+			}
+
+			OnTriggerEnter(other)
+			{
+
+			}
+
+		}
+
+		class Triangle1 extends GameObject
+		{
+			constructor()
+			{
+				super();
+				this.buffer=gl.createBuffer();
+				gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+				//Now we want to add color to our vertices information.
+				this.vertices =
+				[	
+				-.5,-.5,0,0,0,0,
+				.5,-.5,0,1,0,0,
+				0,.5,0,1,0,0,
+				
+				-.5,-.5,0,0,1,0,
+				0,0,-.5,0,1,0,
+				.5,-.5,0,0,1,0,
+				
+				0,0,-.5,0,0,1,
+				.5,-.5,0,0,0,1,
+				0,.5,0,0,0,1,
+				
+				0,.5,0,1,1,0,
+				0,0,-.5,1,1,0,
+				-.5,-.5,0,1,1,0
+				];
+				gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.vertices), gl.STATIC_DRAW);
+				this.loc = [0.0,0.0,0.0];
+				this.rot = [0.0,0.0,0.0];
+			}
+			//Again this could be inherited ... but not always...not all objects
+			
+			render(program)
+			{
+				
+				gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+				
+				//First we bind the buffer for triangle 1
+				var positionAttributeLocation = gl.getAttribLocation(program, "a_position");
+				var size = 3;          // 2 components per iteration
+				var type = gl.FLOAT;   // the data is 32bit floats
+				var normalize = false; // don't normalize the data
+				var stride = 6*Float32Array.BYTES_PER_ELEMENT;	//Size in bytes of each element     // 0 = move forward size * sizeof(type) each iteration to get the next position
+				var offset = 0;        // start at the beginning of the buffer
+				gl.enableVertexAttribArray(positionAttributeLocation);
+				gl.vertexAttribPointer(positionAttributeLocation, size, type, normalize, stride, offset);
+				
+				//Now we have to do this for color
+				var colorAttributeLocation = gl.getAttribLocation(program,"vert_color");
+				//We don't have to bind because we already have the correct buffer bound.
+				size = 3;
+				type = gl.FLOAT;
+				normalize = false;
+				stride = 6*Float32Array.BYTES_PER_ELEMENT;	//Size in bytes of each element
+				offset = 3*Float32Array.BYTES_PER_ELEMENT;									//size of the offset
+				gl.enableVertexAttribArray(colorAttributeLocation);
+				gl.vertexAttribPointer(colorAttributeLocation, size, type, normalize, stride, offset);
+						
+				var tranLoc  = gl.getUniformLocation(program,'transform');
+				gl.uniform3fv(tranLoc,new Float32Array(this.loc));
+				var thetaLoc = gl.getUniformLocation(program,'rotation');
+				gl.uniform3fv(thetaLoc,new Float32Array(this.rot));
+				
+				
+				var primitiveType = gl.TRIANGLES;
+				offset = 0;
+				var count = 12;
+				gl.drawArrays(primitiveType, offset, count);
+			}
+		}
+
+		// --- From Triangle1.js (Modified slightly to extend GameObject to support collisions & rendering out-of-the-box) ---
+		class Triangle2 extends GameObject
+		{
+			constructor()
+			{
+				super();
+				this.buffer=gl.createBuffer();
+				gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+				this.vertices =
+				[
+				-.2,.2,0,	0,0,1,		//0
+				.2,.2,0,	0,0,1,		//1
+				.2,-.2,0,	0,0,1,		//2
+				-.2,-.2,0,	0,0,1,		//3	
+				-.2,.2,-.4,	1,0,0,		//4
+				.2,.2,-.4,	1,0,0,		//5
+				.2,-.2,-.4,	1,0,0,		//6
+				-.2,-.2,-.4,1,0,0		//7
+				];
+				gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.vertices), gl.STATIC_DRAW);
+				
+				this.indexOrder =
+				[
+				0,1,2,	//front face
+				0,2,3,	
+				0,1,5,	//Top Face
+				5,4,1,
+				4,5,6,	//Back Face
+				4,6,7,
+				1,2,5,	//Right face
+				2,5,6,
+				2,3,6,	//Bottom Face
+				3,6,7,
+				0,3,4,	//left face
+				3,4,7]
+				this.ibuffer = gl.createBuffer();
+				gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,this.ibuffer);
+				gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint8Array(this.indexOrder),
+				gl.STATIC_DRAW);
+			}
+			
+			Render(program)
+			{
+				gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+						
+				var positionAttributeLocation = gl.getAttribLocation(program, "a_position");
+				var size = 3;          // 2 components per iteration
+				var type = gl.FLOAT;   // the data is 32bit floats
+				var normalize = false; // don't normalize the data
+				var stride = 6*Float32Array.BYTES_PER_ELEMENT;	//Size in bytes of each element     // 0 = move forward size * sizeof(type) each iteration to get the next position
+				var offset = 0;        // start at the beginning of the buffer
+				gl.enableVertexAttribArray(positionAttributeLocation);
+				gl.vertexAttribPointer(positionAttributeLocation, size, type, normalize, stride, offset);
+				
+				//Now we have to do this for color
+				var colorAttributeLocation = gl.getAttribLocation(program,"vert_color");
+				//We don't have to bind because we already have the correct buffer bound.
+				size = 3;
+				type = gl.FLOAT;
+				normalize = false;
+				stride = 6*Float32Array.BYTES_PER_ELEMENT;	//Size in bytes of each element
+				offset = 3*Float32Array.BYTES_PER_ELEMENT;									//size of the offset
+				gl.enableVertexAttribArray(colorAttributeLocation);
+				gl.vertexAttribPointer(colorAttributeLocation, size, type, normalize, stride, offset);
+						
+				var tranLoc  = gl.getUniformLocation(program,'transform');
+				gl.uniform3fv(tranLoc,new Float32Array(this.loc));
+				var thetaLoc = gl.getUniformLocation(program,'rotation');
+				gl.uniform3fv(thetaLoc,new Float32Array(this.rot));
+				
+				gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,this.ibuffer);
+				
+				gl.drawElements(gl.TRIANGLES,this.indexOrder.length,gl.UNSIGNED_BYTE,0);
+				
+			}
+		}
+		</script>
+
+		<script>
+		class main
+		{	
+			constructor()
+			{
+
+				this.Visual = [];
+				this.Solid = [];
+				this.Trigger = [];
+				this.ObjectCounter = 0;
+
+				this.myWEBGL = new WebGL_Interface();
+				this.program = this.myWEBGL.program;
+				// this.myTriangle = [];
+				this.Keys = [];
+
+			}
+			
+			UpdateAll()
+			{
+			
+				for(var i in this.Visual)
+				{
+
+					this.Visual[i].Update();
+
+				}
+				for(var i in this.Solid)
+				{
+
+					this.Solid[i].Update();
+
+				}
+				for(var i in this.Trigger)
+				{
+
+					this.Trigger[i].Update();
+
+				}
+
+			}
+
+			RenderAll()
+			{
+			
+				for(var i in this.Visual)
+				{
+
+					this.Visual[i].Render(this.program);
+
+				}
+				for(var i in this.Solid)
+				{
+
+					this.Solid[i].Render(this.program);
+
+				}
+				for(var i in this.Trigger)
+				{
+
+					this.Trigger[i].Render(this.program);
+
+				}
+			
+			}
+
+			CheckCollision(loc1, rad1, loc2, rad2)
+			{
+			
+				var x = loc1[0] - loc2[0];
+				var y = loc1[1] - loc2[1];
+				let dist = Math.sqrt(x*x + y*y);
+
+				return dist < (rad1 + rad2);
+
+			}
+
+			
+			CreateObject(type, prefab, loc, rot)
+			{
+			
+				// type 0 = visual
+				// type 1 = solid
+				// type 2 = trigger
+				var temp = new prefab;
+				var id = "ID" + this.ObjectCounter;
+				this.ObjectCounter++;
+				temp.id = id;
+				temp.prefab = prefab;
+				for(let i = 0; i < 3; i++)
+				{
+
+					temp.loc[i] = loc[i];
+					temp.rot[i] = rot[i];
+
+				}
+
+				switch(type)
+				{
+
+					case 0:
+						this.Visual[id] = temp;
+					break;
+					case 1:
+						this.Solid[id] = temp;
+					break;
+					case 2:
+						this.Trigger[id] = temp;
+						temp.isTrigger = true;
+					break;
+					default:
+					break;
+
+				}
+
+				return temp;
+
+			}
+
+			DestroyObject(id)
+			{
+
+				if(id in this.Visual)
+				{
+
+					delete this.Visual[id];
+
+				}
+				
+				if(id in this.Solid)
+				{
+
+					delete this.Solid[id];
+
+				}
+				
+				if(id in this.Trigger)
+				{
+
+					delete this.Trigger[id];
+
+				}
+			
+			}
+			
+			KeyDown(event)
+			{
+
+				this.Keys[String.fromCharCode(event.keyCode)] = true;
+				console.log("The number of the key pressed:  "+ event.keyCode +
+				", the string of the event code: " + String.fromCharCode(event.keyCode));     
+
+			}
+
+			KeyUp(event)
+			{
+
+				this.Keys[String.fromCharCode(event.keyCode)] = false;
+				console.log("The number of the key pressed:  "+ event.keyCode +
+				", the string of the event code: " + String.fromCharCode(event.keyCode));     
+
+			}
+
+			CheckKey(key)
+			{
+
+				if(key in this.Keys)
+				{
+
+					return this.Keys[key];
+
+				}
+
+				return false;
+
+			}
+			
+			MouseClick(event)
+			{
+
+				var rect = canvas.getBoundingClientRect();
+				var realX = event.clientX - rect.left;
+				var realY = event.clientY - rect.top;
+				console.log(realX + "," + realY);
+				var x = -1 + 2 * realX/myCanvas.width;
+				var y = -1 + 2 * (myCanvas.height - realY)/myCanvas.height;
+				console.log("The click occurred on " + x + "," + y);
+
+			}
+
+			
+			//Static call backs go down here
+			//   |
+			//  \ /
+			//   v
+			static keyD(event)
+			{
+				m.KeyDown(event);
+			}
+
+			static keyU(event)
+			{
+				m.KeyUp(event);
+			}
+
+			static mouseH(event)
+			{
+				m.MouseClick(event);
+			}
+			
+			static MainLoop()
+			{
+				// Commenting out Main Loop output to prevent console spam
+				// console.log("Main Loop Running");
+				gl.clear(gl.COLOR_BUFFER_BIT);
+				m.UpdateAll();
+				m.RenderAll();
+				requestAnimationFrame(main.MainLoop);
+			}
+
+		}
+		</script>
+	</Head>
+	<BODY style="padding: 15px;">
+		<HEADER>
+		
+		</HEADER>
+		
+		<CANVAS id="myCanvas" width="640" height="400" style = "border: 1px solid #000;">
+			Your browser does not support canvas.
+		</CANVAS>
+		
+		<br>
+		<button id="myB">Clear Canvas</button>
+		
+		<SCRIPT>
+			var canvas = document.getElementById("myCanvas");
+
+			var m = new main();
+			window.onkeydown = main.keyD;
+			window.onkeyup = main.keyU;
+			canvas.addEventListener("click", main.mouseH);
+			requestAnimationFrame(main.MainLoop);
+
+			var myTri = m.CreateObject(0, Triangle1, [0,0,0], [0,0,0]);		
+		</SCRIPT>
+		
+		<FOOTER>
+		
+		</FOOTER>	
+	</BODY>
+</HTML>

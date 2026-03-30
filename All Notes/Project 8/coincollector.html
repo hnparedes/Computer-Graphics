@@ -1,0 +1,882 @@
+<!DOCTYPE HTML>
+<html lang="en">
+    <head>
+        <title> Project 8 </title>
+        <style>
+            body
+            {
+                margin: 0;
+                background-color: grey;
+                overflow: hidden;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+                color: white;
+                font-family: 'Segoe UI', sans-serif;
+            }
+
+            #game-container
+            {
+                position: relative;
+                width: 900px;
+                height: 600px;
+            }
+
+            canvas
+            {
+                position: absolute;
+                top: 0;
+                left: 0;
+                border: 2px solid #444;
+            }
+
+            #hud
+            {
+                position: absolute;
+                top: 20px;
+                left: 20px;
+                background: rgba(0, 0, 0, 0.85);
+                padding: 15px;
+                border-radius: 10px;
+                z-index: 20;
+                border: 2px solid #ffd700;
+                min-width: 120px;
+            }
+
+            #gameOver
+            {
+                position: absolute;
+                display: none;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(138, 0, 0, 0.7);
+                z-index: 50;
+            }
+
+            button
+            {
+                padding: 10px 20px;
+                font-size: 18px;
+                cursor: pointer;
+                background: #fff;
+                border: none;
+                border-radius: 5px;
+                margin-top: 15px;
+            }
+        </style>
+
+        <script id="VertexShader" type="notjs">
+            attribute vec4 a_position;
+            attribute vec3 a_color;
+            varying vec3 v_color;
+            uniform mat4 u_matrix;
+            void main()
+            {
+                gl_Position = u_matrix * a_position;
+                v_color = a_color;
+            }
+        </script>
+        <script id="FragmentShader" type="notjs">
+            precision mediump float;
+            varying vec3 v_color;
+            void main()
+            {
+                gl_FragColor = vec4(v_color, 1.0);
+            }
+        </script>
+
+        <script>
+
+            // WebGL interface - Handles the setup of the graphics context (taken from webgl_interface.js)
+            class WebGLInterface
+            {
+                constructor()
+                {
+                    this.canvas = document.getElementById("gameCanvas");
+                    this.gl = this.canvas.getContext("webgl");
+                    this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+                    const vSource = document.getElementById("VertexShader").text;
+                    const fSource = document.getElementById("FragmentShader").text;
+                    this.program = this.createProgram(vSource, fSource);
+                    this.gl.useProgram(this.program);
+                    this.gl.enable(this.gl.DEPTH_TEST);
+                    this.gl.clearDepth(1.0);
+                }
+                createShader(type, source)
+                {
+                    const shader = this.gl.createShader(type);
+                    this.gl.shaderSource(shader, source);
+                    this.gl.compileShader(shader);
+                    if(!this.gl.getShaderParameter(shader, this.gl.COMPILE_STATUS))
+                    {
+                        console.error("Error compiling shader " + this.gl.getShaderInfoLog(shader));
+                        this.gl.deleteShader(shader);
+                        return null;
+                    }
+                    return shader;
+                }
+                createProgram(vS, fS)
+                {
+                    const prog = this.gl.createProgram();
+                    this.gl.attachShader(prog, this.createShader(this.gl.VERTEX_SHADER, vS));
+                    this.gl.attachShader(prog, this.createShader(this.gl.FRAGMENT_SHADER, fS));
+                    this.gl.linkProgram(prog);
+                    return prog;
+                }
+            }
+
+            // Base Transform Class - Provides position, rotation, and active state for all game objects (taken from foundation.html)
+            class GameObject
+            {
+                constructor()
+                {
+                    this.loc = [0, 0, 0];
+                    this.rot = [0, 0, 0];
+                    this.active = true;
+                }
+                getMatrix()
+                {
+                    let c = Math.cos(this.rot[1]);
+                    let s = Math.sin(this.rot[1]);
+
+                    return new Float32Array([
+                        c, s, 0, 0,
+                       -s, c, 0, 0,
+                        0, 0, 1, 0,
+                        this.loc[0], this.loc[1], this.loc[2], 1
+                    ]);
+                }
+            }
+
+            class Wall extends GameObject
+            {
+                constructor()
+                {
+                    super();
+                    const gl = window.m.glInterface.gl;
+                    this.buffer = gl.createBuffer();
+
+                    // Phase 2a - create brown squares
+                    const brown = [0.4, 0.2, 0.1];
+                    const v = new Float32Array([
+                        // Coordinates taken from ChatGPT
+                          0.0,   0.0, 0.0, ...brown,
+                        -0.05,  0.05, 0.0, ...brown,
+                         0.05,  0.05, 0.0, ...brown,
+                         0.05, -0.05, 0.0, ...brown,
+                        -0.05, -0.05, 0.0, ...brown,
+                        -0.05,  0.05, 0.0, ...brown,
+                    ]);
+
+                    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+                    gl.bufferData(gl.ARRAY_BUFFER, v, gl.STATIC_DRAW);
+                }
+
+                Render(program)
+                {
+                    const gl = window.m.glInterface.gl
+                    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+                    const pos = gl.getAttribLocation(program, "a_position");
+                    const col = gl.getAttribLocation(program, "a_color");
+                    gl.enableVertexAttribArray(pos);
+                    gl.enableVertexAttribArray(col);
+                    gl.vertexAttribPointer(pos, 3, gl.FLOAT, false, 24, 0);
+                    gl.vertexAttribPointer(col, 3, gl.FLOAT, false, 24, 12);
+                    const matrixLoc = gl.getUniformLocation(program, "u_matrix");
+                    gl.uniformMatrix4fv(matrixLoc, false, this.getMatrix());
+
+                    // Phase 2a - use gl.triangle_fan
+                    gl.drawArrays(gl.TRIANGLE_FAN, 0, 6);
+                }
+            }
+
+            // Phase 1
+            // Player class - Multi-color object character with steering rotation and top-mounted arms (taken from Gemini)
+            class Player extends GameObject
+            {
+                constructor()
+                {
+                    super();
+                    const gl = window.m.glInterface.gl;
+                    this.buffer = gl.createBuffer();
+
+                    // Phase 1b - 2 colors at least.
+                    const red = [1.0, 0.0, 0.0];
+                    const blue = [0.0, 0.0, 1.0];
+                    const cyan = [0.0, 1.0, 1.0];
+                    const gray = [0.5, 0.5, 0.5];
+
+                    // Phase 1a - create a player object
+                    // Phase 1c - create the object using gl.triangles
+
+                    // Coordinates taken from ChatGPT
+                    const v = new Float32Array([
+                    // SQUARE
+                    -0.05,  0.05, 0.0, ...red,
+                     0.05,  0.05, 0.0, ...red,
+                     0.05, -0.05, 0.0, ...red,
+
+                    -0.05,  0.05, 0.0, ...red,
+                     0.05, -0.05, 0.0, ...red,
+                    -0.05, -0.05, 0.0, ...red,
+
+                    // Left base triangle
+                    -0.05,  0.05, 0.0, ...blue,
+                    -0.05, -0.05, 0.0, ...blue,
+                    -0.12,  0.00, 0.0, ...blue,
+
+                    // Right base triangle
+                    0.05,  0.05, 0.0, ...blue,
+                    0.05, -0.05, 0.0, ...blue,
+                    0.12,  0.00, 0.0, ...blue,
+
+                    // Top-left triangle
+                    -0.05,  0.05, 0.0, ...cyan,
+                    -0.12,  0.00, 0.0, ...cyan,
+                    -0.09,  0.10, 0.0, ...cyan,
+
+                    // Top-right triangle
+                    0.05,  0.05, 0.0, ...cyan,
+                    0.12,  0.00, 0.0, ...cyan,
+                    0.09,  0.10, 0.0, ...cyan,
+
+                    // Top center triangles
+                    -0.05,  0.05, 0.0,  ...gray,
+                    -0.01,  0.05, 0.0,  ...gray,
+                    -0.03,  0.0846, 0.0, ...gray,
+
+                     0.01,  0.05, 0.0,  ...gray,
+                     0.05,  0.05, 0.0,  ...gray,
+                     0.03,  0.0846, 0.0, ...gray,
+                    ]);
+
+                    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+                    gl.bufferData(gl.ARRAY_BUFFER, v, gl.STATIC_DRAW);
+                }
+                
+                Update()
+                {
+                    let speed = 0.008;
+                    let rotSpeed = 0.04;
+
+                    // Phase 1e - If the player presses a the object will rotate left
+                    // Phase 1d - The character rotates around the z-axis (engine natively calculates with rot[1])
+                    if(m.Keys['a'] || m.Keys['A'])
+                    {
+                        this.rot[1] += rotSpeed;
+                    }
+
+                    // Phase 1f - If the player presses d the object will rotate right
+                    if(m.Keys['d'] || m.Keys['D'])
+                    {
+                        this.rot[1] -= rotSpeed;
+                    }
+
+                    let dirX = -Math.sin(this.rot[1]);
+                    let dirY = Math.cos(this.rot[1]);
+
+                    let dx = 0;
+                    let dy = 0;
+
+                    // Phase 1g - Move forward IN RESPECTS TO THE DIRECTION IT IS FACING!
+                    if(m.Keys['w'] || m.Keys['W'])
+                    {
+                        dx += dirX * speed;
+                        dy += dirY * speed;
+                    }
+
+                    // Phase 1h - Move backward IN RESPECTS TO THE DIRECTION IT IS FACING!
+                    if(m.Keys['s'] || m.Keys['S'])
+                    {
+                        dx -= dirX * speed;
+                        dy -= dirY * speed;
+                    }
+
+                    // Phase 2b - Check to see if the players NEXT position would be colliding.
+                    // Phase 1d - The character will move with respects to the x and y-axis
+                    let nextX = this.loc[0] + dx;
+                    let nextY = this.loc[1] + dy;
+                    let canMove = true;
+
+                    for(let i = 0; i < m.Solid.length; i++)
+                    {
+                        let obj = m.Solid[i];
+                        if(obj instanceof Wall)
+                        {
+                            // Phase 2c - The player can be modelled as a point (just not pass through).
+                            // We check if our next point (nextX, nextY) falls inside the bounds of a wall.
+                            // Walls are 0.1 wide (-0.11 to 0.11 from their center). We use 0.10 to allow slight overlap without passing through.
+                            if(Math.abs(nextX - obj.loc[0]) < 0.10 && Math.abs(nextY - obj.loc[1]) < 0.10)
+                            {
+                                // Phase 2b - If it is colliding, do not move
+                                canMove = false;
+                                break;
+                            }
+                        }
+                    }
+
+                    // Phase 2c - There cannot be any jitter when the player hits the wall.
+                    // By only applying the coordinates when canMove is true, the player halts cleanly without bouncing or jittering.
+                    if(canMove)
+                    {
+                        this.loc[0] = nextX;
+                        this.loc[1] = nextY;
+                    }
+                }
+
+                Render(program)
+                {
+                    const gl = window.m.glInterface.gl
+                    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+                    const pos = gl.getAttribLocation(program, "a_position");
+                    const col = gl.getAttribLocation(program, "a_color");
+                    gl.enableVertexAttribArray(pos);
+                    gl.enableVertexAttribArray(col);
+                    gl.vertexAttribPointer(pos, 3, gl.FLOAT, false, 24, 0);
+                    gl.vertexAttribPointer(col, 3, gl.FLOAT, false, 24, 12);
+                    const matrixLoc = gl.getUniformLocation(program, "u_matrix");
+                    gl.uniformMatrix4fv(matrixLoc, false, this.getMatrix());
+                    gl.drawArrays(gl.TRIANGLES, 0, 24);
+                }
+            }
+
+            // Phase 4 - Automated enemy object.
+            class Enemy extends GameObject
+            {
+
+                constructor()
+                {
+                    super();
+                    const gl = window.m.glInterface.gl;
+                    this.buffer = gl.createBuffer();
+
+                    // Phase 4a - Make an object the same as the player, but with different colors
+                    const green = [0.0, 1.0, 0.0];
+                    const gray = [0.7, 0.7, 0.7];
+                    const black = [0.0, 0.0, 0.0];
+                    
+                    // Coordinates taken from Gemini
+                    const v = new Float32Array([
+                     // --- CENTER GREEN SQUARE (2 Triangles) ---
+                    -0.05,  0.05, 0.0, ...green,
+                     0.05,  0.05, 0.0, ...green,
+                     0.05, -0.05, 0.0, ...green,
+
+                    -0.05,  0.05, 0.0, ...green,
+                     0.05, -0.05, 0.0, ...green,
+                    -0.05, -0.05, 0.0, ...green,
+
+                    // --- TOP GREEN TRIANGLES (3 Triangles) ---
+                    // Left
+                    -0.05,   0.05, 0.0, ...green,
+                    -0.016,  0.05, 0.0, ...green,
+                    -0.033,  0.08, 0.0, ...green,
+                    // Middle
+                    -0.016,  0.05, 0.0, ...green,
+                     0.016,  0.05, 0.0, ...green,
+                     0.000,  0.08, 0.0, ...green,
+                    // Right
+                     0.016,  0.05, 0.0, ...green,
+                     0.05,   0.05, 0.0, ...green,
+                     0.033,  0.08, 0.0, ...green,
+
+                    // --- BOTTOM GREEN TRIANGLES (3 Triangles) ---
+                    // Left
+                    -0.05,  -0.05, 0.0, ...green,
+                    -0.016, -0.05, 0.0, ...green,
+                    -0.033, -0.08, 0.0, ...green,
+                    // Middle
+                    -0.016, -0.05, 0.0, ...green,
+                     0.016, -0.05, 0.0, ...green,
+                     0.000, -0.08, 0.0, ...green,
+                    // Right
+                     0.016, -0.05, 0.0, ...green,
+                     0.05,  -0.05, 0.0, ...green,
+                     0.033, -0.08, 0.0, ...green,
+
+                    // --- SIDE BLACK TRIANGLES (2 Triangles) ---
+                    // Left Black
+                    -0.05,  0.05, 0.0, ...black,
+                    -0.05, -0.05, 0.0, ...black,
+                    -0.12,  0.00, 0.0, ...black,
+                    // Right Black
+                     0.05,  0.05, 0.0, ...black,
+                     0.05, -0.05, 0.0, ...black,
+                     0.12,  0.00, 0.0, ...black,
+
+                    // --- GREY FLANKING WINGS (4 Triangles) ---
+                    // Top-Left Wing
+                    -0.05,  0.05, 0.0, ...gray,
+                    -0.12,  0.00, 0.0, ...gray,
+                    -0.08,  0.13, 0.0, ...gray,
+                    // Bottom-Left Wing
+                    -0.05, -0.05, 0.0, ...gray,
+                    -0.12,  0.00, 0.0, ...gray,
+                    -0.08, -0.13, 0.0, ...gray,
+                    // Top-Right Wing
+                     0.05,  0.05, 0.0, ...gray,
+                     0.12,  0.00, 0.0, ...gray,
+                     0.08,  0.13, 0.0, ...gray,
+                    // Bottom-Right Wing
+                     0.05, -0.05, 0.0, ...gray,
+                     0.12,  0.00, 0.0, ...gray,
+                     0.08, -0.13, 0.0, ...gray
+                    ]);
+                
+                    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+                    gl.bufferData(gl.ARRAY_BUFFER, v, gl.STATIC_DRAW);
+                    this.velocity = [0.010, 0.024, 0];
+                }
+
+                Update()
+                {
+                    // Phase 4b - It will move diagonally
+                    // By adding velocity to both X and Y simultaneously, the object moves at an angle.
+                    this.loc[0] += this.velocity[0];
+                    this.loc[1] += this.velocity[1];
+
+                    // Phase 4b - until it hits a wall, and then bounces off it
+                    // (Checking the top and bottom boundaries)
+                    if(this.loc[1] > 0.81 || this.loc[1] < -0.81)
+                    {
+                        this.velocity[1] *= -1;
+                    }
+
+                    // (Checking the left and right boundaries)
+                    if(this.loc[0] > 0.81 || this.loc[0] < -0.81)
+                    {
+                        this.velocity[0] *= -1;
+                    }
+
+                    // Phase 4b - The bad guy rotates around the z-axis
+                    // Even though rotation is not a requirement
+                    // Having it rotate adds a nice visual flair and also makes it more challenging to hit.
+                    this.rot[1] += 0.03;
+                }
+
+                Render(program)
+                {
+                    const gl = window.m.glInterface.gl
+                    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+                    const pos = gl.getAttribLocation(program, "a_position");
+                    const col = gl.getAttribLocation(program, "a_color");
+                    gl.enableVertexAttribArray(pos);
+                    gl.enableVertexAttribArray(col);
+                    gl.vertexAttribPointer(pos, 3, gl.FLOAT, false, 24, 0);
+                    gl.vertexAttribPointer(col, 3, gl.FLOAT, false, 24, 12);
+                    const matrixLoc = gl.getUniformLocation(program, "u_matrix");
+                    gl.uniformMatrix4fv(matrixLoc, false, this.getMatrix());
+
+                    // Phase 4a - Render using gl.triangles
+                    gl.drawArrays(gl.TRIANGLES, 0, 42);
+                }
+            }
+
+            // Phase 3
+            // Coin class - 3D cylindrical gold coin with Y-axis rotation (taken from Gemini)
+            // Rotation logic taken from Rotations.html and placement.html
+            class Coin extends GameObject
+            {
+                constructor()
+                {
+                    super();
+                    const gl = window.m.glInterface.gl;
+                    this.buffer = gl.createBuffer();
+
+                    // Phase 3a - The coin objects must be circular
+                    const gld = [1.0, 0.8, 0.0];
+                    const numSegments = 32;
+                    const radius = 0.05;
+                    let vertices = [];
+
+                    // center
+                    vertices.push(0.0, 0.0, 0.0, ...gld);
+
+                    // We use gl.triangle_fan
+                    // We loop through 360 degrees (2 * PI) to create line segments.
+                    for(let i = 0; i <= numSegments; i++)
+                    {
+                        let theta = (i / numSegments) * 2 * Math.PI;
+                        vertices.push(
+                            // Point A on the line segment
+                            radius * Math.cos(theta), 
+                            // Point B on the line segment
+                            radius * Math.sin(theta), 
+                            0.0, 
+                            ...gld
+                        );
+                    }
+
+                    this.vertexCount = numSegments * 2;
+                    const v = new Float32Array(vertices);
+
+                    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+                    gl.bufferData(gl.ARRAY_BUFFER, v, gl.STATIC_DRAW);
+                }
+
+                // Phase 3b - The coins objects must rotate around the y-Axis (NOT the z).
+                // We override the base getMatrix() to apply a Y-axis rotation matrix instead of Z-axis.
+                getMatrix()
+                {
+                    let c = Math.cos(this.rot[1]);
+                    let s = Math.sin(this.rot[1]);
+
+                    return new Float32Array([
+                        c, 0, -s, 0,
+                        0, 1,  0, 0,
+                        s, 0,  c, 0,
+                        this.loc[0], this.loc[1], this.loc[2], 1
+                    ]);
+                }
+
+                Update()
+                {
+                    this.rot[1] += 0.06;
+                }
+
+                Render(program)
+                {
+                    const gl = window.m.glInterface.gl
+                    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+                    const pos = gl.getAttribLocation(program, "a_position");
+                    const col = gl.getAttribLocation(program, "a_color");
+                    gl.enableVertexAttribArray(pos);
+                    gl.enableVertexAttribArray(col);
+                    gl.vertexAttribPointer(pos, 3, gl.FLOAT, false, 24, 0);
+                    gl.vertexAttribPointer(col, 3, gl.FLOAT, false, 24, 12);
+                    const matrixLoc = gl.getUniformLocation(program, "u_matrix");
+                    gl.uniformMatrix4fv(matrixLoc, false, this.getMatrix());
+
+                    // Phase 3a - Render using gl.triangle_fan
+                    gl.drawArrays(gl.TRIANGLE_FAN, 0, this.vertexCount);
+                }
+            }
+
+            class Bullet extends GameObject
+            {
+
+                constructor()
+                {
+                    super();
+                    const gl = window.m.glInterface.gl;
+                    this.buffer = gl.createBuffer();
+
+                    // Phase E - make a small grey triangle
+                    const grey = [0.5, 0.5, 0.5];
+
+                    const v = new Float32Array([
+                        0.00,  0.03, 0.0, ...grey,
+                       -0.02, -0.02, 0.0, ...grey,
+                        0.02, -0.02, 0.0, ...grey
+                    ]);
+                
+                    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+                    gl.bufferData(gl.ARRAY_BUFFER, v, gl.STATIC_DRAW);
+                    this.velocity = [0, 0, 0];
+                }
+
+                Update()
+                {
+                    this.loc[0] += this.velocity[0];
+                    this.loc[1] += this.velocity[1];
+                    if(Math.abs(this.loc[0]) > 1.2 || Math.abs(this.loc[1]) > 1.2)
+                    {
+                        this.active = false;
+                    }
+                }
+
+                Render(program)
+                {
+                    const gl = window.m.glInterface.gl
+                    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+                    const pos = gl.getAttribLocation(program, "a_position");
+                    const col = gl.getAttribLocation(program, "a_color");
+                    gl.enableVertexAttribArray(pos);
+                    gl.enableVertexAttribArray(col);
+                    gl.vertexAttribPointer(pos, 3, gl.FLOAT, false, 24, 0);
+                    gl.vertexAttribPointer(col, 3, gl.FLOAT, false, 24, 12);
+                    const matrixLoc = gl.getUniformLocation(program, "u_matrix");
+                    gl.uniformMatrix4fv(matrixLoc, false, this.getMatrix());
+
+                    // Phase E - Render using gl.triangles
+                    gl.drawArrays(gl.TRIANGLES, 0, 3);
+                }
+
+            }
+
+            // Phase 2
+            // Main Engine Class - Strictly follows method structure and static handlers (taken from Gemini)
+            class Main
+            {
+
+                constructor()
+                {
+                    this.Visual = [];
+                    this.Solid = [];
+                    this.Trigger = [];
+                    this.ObjectCounter = 0;
+                    this.Keys = {};
+                    this.glInterface = new WebGLInterface();
+                    this.score = 0;
+                    this.gameOver = false;
+                    this.spacePressed = false;
+                }
+
+                // Standard Instance Methods
+                getRandomCoordinate()
+                {
+                    // Helper function to get a random coordinate inside the canvas
+                    return (Math.random() * 1.6) - 0.8;
+                }
+
+                CreateObject(type, prefab, loc, rot)
+                {
+                    var temp = new prefab();
+                    this.ObjectCounter++;
+                    temp.id = "ID" + this.ObjectCounter;
+                    temp.loc = loc;
+                    temp.rot = rot;
+
+                    if(type == 0)
+                    {
+                        this.Visual.push(temp);
+                    }
+                    else if(type == 1)
+                    {
+                        this.Solid.push(temp);
+                    }
+                    else if(type == 2)
+                    {
+                        this.Trigger.push(temp);
+                    }
+                    return temp;
+                }
+
+                FireBullet()
+                {
+                    let b = this.CreateObject(2, Bullet, [...this.player.loc], [0, this.player.rot[1], 0]);
+
+                    // Phase Ea - The bullet will fly forward at double the rate the player moves.
+                    // The player's speed is 0.008, so quadruple that rate is exactly 0.032.
+                    // triple it for medium difficulty or double it for harder difficulty.
+                    let speed = 0.016;
+
+                    // Phase Ea - The bullet is calculated
+                    // by using -Math.sin so it perfectly matches the player's forward facing direction
+                    b.velocity = [-Math.sin(this.player.rot[1]) * speed, Math.cos(this.player.rot[1]) * speed, 0];
+                }
+
+                UpdateAll()
+                {
+                    if(this.gameOver)
+                    {
+                        return;
+                    }
+
+                    // Only update the player if they haven't been destroyed
+                    if(this.player.active)
+                    {
+                        this.player.Update();
+                    }
+
+                    // Phase Ea - The player must shoot one bullet at a time
+                    // We use .some() to search the Trigger array. If a bullet is found, bulletActive becomes true.
+                    let bulletActive = this.Trigger.some(obj => obj instanceof Bullet);
+
+                    // Phase E - If space the space bar is pressed you will create a bullet
+                    if(this.Keys[' '] && !this.spacePressed && !bulletActive)
+                    {
+                        this.FireBullet();
+                        this.spacePressed = true;
+                    }
+
+                    if(!this.Keys[' '])
+                    {
+                        this.spacePressed = false;
+                    }
+
+                    this.Solid.forEach(obj => { 
+                        if(obj.Update)
+                        {
+                            obj.Update();
+                        }
+
+                        // Phase 4c - If the good guy hits the bad guy
+                        if(obj instanceof Enemy && this.CheckCollision(this.player, obj, 0.11) && this.player.active)
+                        {
+                            // Phase 4c - ...the good guy is destroyed
+                            // Deactivating the player removes their ability to update or interact.
+                            this.player.active = false;
+
+                            // Phase 4c - ...and "Game Over is printed
+                            // The built-in EndGame() function handles the HTML display perfectly
+                            this.EndGame();
+                        }
+                    });
+
+                    for(let i = this.Trigger.length - 1; i >= 0; i--)
+                    {
+                        let obj = this.Trigger[i];
+                        obj.Update();
+
+                        // Phase 3c - If the player collides with the coin...
+                        if(obj instanceof Coin && this.CheckCollision(this.player, obj, 0.1) && this.player.active)
+                        {
+                            // Phase 3c - ...the +1 is added to the player's score
+                            this.score++;
+
+                            // Phase 3c - ...and the coin is destroyed
+                            // (Splice removes it from the Trigger array, halting its updates and renders)
+                            this.Trigger.splice(i, 1);
+
+                            // The engine also spawns a replacement coin here to keep the game going
+                            this.CreateObject(2, Coin, [this.getRandomCoordinate(), this.getRandomCoordinate(), 0], [0, 0, 0]);
+                        }
+
+                        if(obj instanceof Bullet)
+                        {
+                            for(let j = this.Solid.length - 1; j >= 0; j--)
+                            {
+                                let solidObj = this.Solid[j];
+
+                                // Phase Eb - If the bullet strikes a wall, the bullet will be destroyed
+                                if(solidObj instanceof Wall && this.CheckCollision(obj, solidObj, 0.08))
+                                {
+                                    obj.active = false;
+                                }
+
+                                // Phase Ec - If the bullet strikes an enemy
+                                if(solidObj instanceof Enemy && this.CheckCollision(obj, solidObj, 0.06))
+                                {
+                                    obj.active = false;
+                                    // Phase Ec - ...the enemy will be destroyed
+                                    this.Solid.splice(j, 1);
+                                }
+                            }
+                        }
+
+                        // This officially removes the destroyed bullet from the games memory
+                        if(!obj.active)
+                        {
+                            this.Trigger.splice(i, 1);
+                        }
+                    }
+                }
+
+                RenderAll()
+                {
+                    const gl = this.glInterface.gl;
+                    gl.clearColor(0.08, 0.08, 0.1, 1.0);
+                    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+                    const prog = this.glInterface.program;
+
+                    this.player.Render(prog);
+                    [this.Visual, this.Solid, this.Trigger].forEach(list => list.forEach(o => o.Render(prog)));
+
+                    // Phase 3d - The score should be displayed
+                    document.getElementById("scoreVal").innerText = this.score;
+                }
+
+                CheckCollision(a, b, threshold)
+                {
+                    let dx = Math.abs(a.loc[0] - b.loc[0]);
+                    let dy = Math.abs(a.loc[1] - b.loc[1]);
+                    return dx < threshold && dy < threshold;
+                }
+
+                EndGame()
+                {
+                    this.gameOver = true;
+                    document.getElementById("gameOver").style.display = "flex";
+                }
+
+                KeyDown(e)
+                {
+                    this.Keys[e.key == " " ? " " : String.fromCharCode(e.keyCode)] = true;
+                }
+
+                KeyUp(e)
+                {
+                    this.Keys[e.key == " " ? " " : String.fromCharCode(e.keyCode)] = false;
+                }
+
+                // Static Handlers
+                static KeyD(e)
+                {
+                    m.KeyDown(e);
+                }
+
+                static KeyU(e)
+                {
+                    m.KeyUp(e);
+                }
+
+                static MainLoop()
+                {
+                   m.UpdateAll();
+                   m.RenderAll();
+                   requestAnimationFrame(Main.MainLoop);
+                }
+
+            }
+        </script>
+    </head>
+    <body>
+        <div id="game-container">
+            <canvas id="gameCanvas" width="900" height="600"></canvas>
+            <canvas id="uiCanvas" width="900" height="600"></canvas>
+            <div id="hud">
+                <div class="stat-label">
+                    Coins Collected:
+                </div>
+                <div id="scoreVal" class="stat-value">
+                    0
+                </div>
+            </div>
+            <div id="gameOver">
+                <h1>Game Over</h1>
+                <button onclick="location.reload()">
+                    Restart Game
+                </button>
+            </div>
+        </div>
+
+        <script>
+            var m;
+            window.onload = function()
+            {
+                m = new Main();
+                window.addEventListener("keydown", Main.KeyD);
+                window.addEventListener("keyup", Main.KeyU);
+
+                m.player = m.CreateObject(1, Player, [0, -0.75, 0], [0, 0, 0]);
+                m.CreateObject(1, Enemy, [-0.5, 0.5, 0], [0, 0, 0]);
+
+                // Spawn Left and Right Walls
+                for(let x = -0.94; x <= 0.94; x += 0.11)
+                {
+                    m.CreateObject(1, Wall, [x, 0.94, 0], [0, 0, 0]);
+                    m.CreateObject(1, Wall, [x, -0.93, 0], [0, 0, 0]);
+                }
+
+                // Spawn Top and Bottom Walls
+                for(let y = -0.82; y <= 0.83; y += 0.11)
+                {
+                    m.CreateObject(1, Wall, [-0.94, y, 0], [0, 0, 0]);
+                    m.CreateObject(1, Wall, [0.93, y, 0], [0, 0, 0]);
+                }
+
+                // Spawn Initial Coin
+                m.CreateObject(2, Coin, [m.getRandomCoordinate(), m.getRandomCoordinate(), 0], [0, 0, 0]);
+
+                Main.MainLoop();
+            }
+        </script>
+    </body>
+</html>
