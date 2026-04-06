@@ -1,0 +1,610 @@
+<!DOCTYPE HTML>
+<HTML lang="en">
+	<Head>
+	<Title> Project 9 </TITLE>
+        
+        <style>
+            body
+            {
+                margin: 0;
+                overflow: hidden;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+            }
+            canvas
+            {
+                border: 1px solid #222;
+            }
+        </style>
+
+		<script id="2dVertexShader" type="notjs">
+		attribute vec4 a_position;	
+		attribute vec3 vert_color;
+		varying vec3 fragColor;
+		
+		uniform vec3 transform;
+		uniform vec3 rotation;	
+		uniform vec3 worldLoc;
+		uniform vec3 worldRot;
+		
+		uniform float n;
+		uniform float f;
+		
+		void main()
+        {
+            fragColor = vert_color;
+
+            float c = cos(rotation.y);
+            float s = sin(rotation.y);
+
+            float cx = cos(rotation.x);
+            float sx = sin(rotation.x);
+            float cz = cos(rotation.z);
+            float sz = sin(rotation.z);
+
+            mat4 rotateXModel = mat4(
+                1.0, 0.0,  0.0, 0.0,
+                0.0, cx,    sx, 0.0,
+                0.0,-sx,    cx, 0.0,
+                0.0, 0.0,  0.0, 1.0
+            );
+
+            mat4 rotateYModel = mat4(
+                c,   0.0,   -s, 0.0,
+                0.0, 1.0,  0.0, 0.0,
+                s,   0.0,   c,  0.0,
+                0.0, 0.0,  0.0, 1.0
+            );
+
+            mat4 rotateZModel = mat4(
+                cz, sz,   0.0, 0.0,
+               -sz, cz,   0.0, 0.0,
+                0.0, 0.0, 1.0, 0.0,
+                0.0, 0.0, 0.0, 1.0
+            );
+            
+            mat4 translateModel = mat4(
+                1.0, 0.0, 0.0, 0.0,
+                0.0, 1.0, 0.0, 0.0,
+                0.0, 0.0, 1.0, 0.0,
+                transform.x, transform.y, transform.z, 1.0
+            );
+
+            float cw = cos(-worldRot.y);
+            float sw = sin(-worldRot.y);
+            mat4 rotateViewY = mat4(
+                cw,  0.0, -sw,  0.0,
+                0.0, 1.0,  0.0, 0.0,
+                sw,  0.0,  cw,  0.0,
+                0.0, 0.0,  0.0, 1.0
+            );
+            
+            mat4 translateView = mat4(
+                1.0, 0.0, 0.0, 0.0,
+                0.0, 1.0, 0.0, 0.0,
+                0.0, 0.0, 1.0, 0.0,
+                -worldLoc.x, -worldLoc.y, -worldLoc.z, 1.0
+            );
+
+            float aspect = 640.0 / 400.0;
+            float fov = 1.0; 
+            float rangeInv = 1.0 / (n - f);
+            float f_calc = 1.0 / tan(fov / 2.0);
+            
+            mat4 perspective = mat4(
+                f_calc / aspect, 0.0, 0.0, 0.0,
+                0.0, f_calc, 0.0, 0.0,
+                0.0, 0.0, (n + f) * rangeInv, -1.0,
+                0.0, 0.0, (2.0 * n * f) * rangeInv, 0.0
+            );
+            
+            // Order: Projection * View * Model * Position
+            gl_Position = perspective * rotateViewY * translateView * translateModel * rotateYModel * a_position;
+        }
+		</SCRIPT>
+		<script id="2dFragmentShader" type="notjs">
+		precision mediump float;
+		varying vec3 fragColor;
+		void main()
+		{
+			gl_FragColor = vec4(fragColor,1.0);
+		}
+		</script>
+		
+		<script>
+            class WebGL_Interface 
+            {
+                constructor() 
+                {
+                    this.vertexShaderSource = document.getElementById("2dVertexShader").text;
+                    this.fragmentShaderSource = document.getElementById("2dFragmentShader").text;
+                    
+                    this.vertexShader = this.createShader(gl.VERTEX_SHADER, this.vertexShaderSource);
+                    this.fragmentShader = this.createShader(gl.FRAGMENT_SHADER, this.fragmentShaderSource);
+                    
+                    // Link to program
+                    this.program = this.createProgram(this.vertexShader, this.fragmentShader);
+                    
+                    // Setup viewport
+                    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+                    
+                    // Set clear colors (black background)
+                    gl.clearColor(0.0, 0.0, 0.0, 1.0);
+                    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);        
+                    
+                    // Enable Depth Testing so shapes occlude each other properly
+                    gl.enable(gl.DEPTH_TEST);      
+                    gl.useProgram(this.program);
+
+                    var worldLoc = gl.getUniformLocation(this.program, "worldLoc");
+                    gl.uniform3fv(worldLoc, new Float32Array([0.0, 0.0, 0.0]));
+                    var worldrot = gl.getUniformLocation(this.program, "worldRot");
+                    gl.uniform3fv(worldrot, new Float32Array([0.0, 0.0, 0.0]));
+
+                    var tempLoc = gl.getUniformLocation(this.program, "n");
+                    gl.uniform1f(tempLoc, .1);
+                    tempLoc = gl.getUniformLocation(this.program, "f");
+                    gl.uniform1f(tempLoc, 500);
+                }
+                
+                createShader(type, source) 
+                {
+                    var shader = gl.createShader(type);
+                    gl.shaderSource(shader, source);
+                    gl.compileShader(shader);
+                    if (gl.getShaderParameter(shader, gl.COMPILE_STATUS)) 
+                    {
+                        return shader;
+                    }
+                    
+                    console.error("Shader Error: " + gl.getShaderInfoLog(shader));
+                    gl.deleteShader(shader);
+                }
+                
+                createProgram(vs, fs) 
+                {
+                    var program = gl.createProgram();
+                    gl.attachShader(program, vs);
+                    gl.attachShader(program, fs);
+                    gl.linkProgram(program);
+                    if (gl.getProgramParameter(program, gl.LINK_STATUS)) 
+                    {
+                        return program;
+                    }
+                    
+                    console.error("Program Error: " + gl.getProgramInfoLog(program));
+                    gl.deleteProgram(program);  
+                }
+            }
+
+            class GameObject
+            {
+                constructor() 
+                {
+                    this.loc = [0,0,0];
+                    this.rot = [0,0,0];
+                    this.scale = [1,1,1];
+                    this.velocity = [0,0,0];
+                    this.angVelocity = [0,0,0];
+                }
+                
+                Move()
+                {
+                    for(var i = 0; i < 3; i++)
+                    {
+                        this.loc[i] += this.velocity[i];
+                        this.rot[i] += this.angVelocity[i];
+                    }
+                }
+
+                Update()
+                {
+                    this.Move();
+                }
+
+                Render(program)
+                {
+                    console.warn(this.name + " render() not overridden");
+                }	
+            }
+
+            class Asteroid extends GameObject
+            {
+                constructor()
+                {
+                    super();
+                    this.buffer=gl.createBuffer();
+                    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+                    
+                    // Phase 1a & 1b: Create vertices for a 3D asteroid (uses the same color for all vertices)
+                    // Coordinates taken from Gemini (Find a way to make them abstract when I have more time)
+                    const positions = [
+                    // Top Half
+                    0.0, 1.0, 0.0,   1.0, 0.0, 0.0,   0.5, 0.0, 0.866,
+                    0.0, 1.0, 0.0,   0.5, 0.0, 0.866, -0.5, 0.0, 0.866,
+                    0.0, 1.0, 0.0,  -0.5, 0.0, 0.866, -1.0, 0.0, 0.0,
+                    0.0, 1.0, 0.0,  -1.0, 0.0, 0.0,  -0.5, 0.0, -0.866,
+                    0.0, 1.0, 0.0,  -0.5, 0.0, -0.866, 0.5, 0.0, -0.866,
+                    0.0, 1.0, 0.0,   0.5, 0.0, -0.866, 1.0, 0.0, 0.0,
+                    // Bottom Half
+                    0.0, -1.0, 0.0,  0.5, 0.0, 0.866,  1.0, 0.0, 0.0,
+                    0.0, -1.0, 0.0, -0.5, 0.0, 0.866,  0.5, 0.0, 0.866,
+                    0.0, -1.0, 0.0, -1.0, 0.0, 0.0,   -0.5, 0.0, 0.866,
+                    0.0, -1.0, 0.0, -0.5, 0.0, -0.866, -1.0, 0.0, 0.0,
+                    0.0, -1.0, 0.0,  0.5, 0.0, -0.866, -0.5, 0.0, -0.866,
+                    0.0, -1.0, 0.0,  1.0, 0.0, 0.0,    0.5, 0.0, -0.866
+                    ];
+
+                    this.vertices = [];
+
+                    for(let i = 0; i < positions.length; i += 9)
+                    {
+                        const grey = Math.random();
+
+                        for(let j = 0; j < 3; j++)
+                        {
+                            const base = i + (j * 3);
+                            this.vertices.push(
+                                positions[base],
+                                positions[base + 1],
+                                positions[base + 2],
+                                grey, grey, grey
+                            );
+                        }
+                    }
+
+                    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.vertices), gl.STATIC_DRAW);
+                    this.loc = [0.0,0.0,0.0];
+                    this.rot = [0.0,0.0,0.0];
+                    // Phase 3a: Tracks hits for splicing out of the array when destroyed
+                    // Solved by Gemini
+                    this.hp = 3
+                }
+             
+                Render(program)
+                {
+                    
+                    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+                    
+                    var positionAttributeLocation = gl.getAttribLocation(program, "a_position");
+                    gl.enableVertexAttribArray(positionAttributeLocation);
+                    gl.vertexAttribPointer(positionAttributeLocation, 3, gl.FLOAT, false, 6 * Float32Array.BYTES_PER_ELEMENT, 0);
+                    
+                    var colorAttributeLocation = gl.getAttribLocation(program,"vert_color");
+                    gl.enableVertexAttribArray(colorAttributeLocation);
+                    gl.vertexAttribPointer(colorAttributeLocation, 3, gl.FLOAT, false, 6 * Float32Array.BYTES_PER_ELEMENT, 3 * Float32Array.BYTES_PER_ELEMENT);
+                            
+                    gl.uniform3fv(gl.getUniformLocation(program, "transform"), new Float32Array(this.loc));
+                    gl.uniform3fv(gl.getUniformLocation(program, "rotation"), new Float32Array(this.rot));
+
+                    gl.drawArrays(gl.TRIANGLES, 0, 36);
+                }
+            }
+
+            // Phase 3: Bullet Implementation
+            // Uses triangle fan to create a simple circular bullet, with a white color
+            // Solved by Gemini
+            class Bullet extends GameObject
+            {
+                constructor()
+                {
+                    super();
+                    this.buffer = gl.createBuffer();
+                    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+
+                    this.vertices = [];
+                    let segments = 16;
+                    let radius = 0.15;
+
+                    this.vertices.push(0.0, 0.0, 0.0)
+                    this.vertices.push(1.0, 1.0, 1.0)
+
+                    for(let i = 0; i <= segments; i++)
+                    {
+                        let angle = (i / segments) * 2 * Math.PI;
+                        let x = Math.cos(angle) * radius;
+                        let y = Math.sin(angle) * radius;
+                        this.vertices.push(x, y, 0.0);
+                        this.vertices.push(1.0, 1.0, 1.0);
+                    }
+
+                    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.vertices), gl.STATIC_DRAW);
+                    this.loc = [0.0, 0.0, 0.0];
+                    this.rot = [0.0, 0.0, 0.0];
+                    this.velocity = [0.0, 0.0, 0.0];
+                    this.numVertices = segments + 2;
+                }
+
+                Render(program)
+                {
+                    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+
+                    var positionAttributeLocation = gl.getAttribLocation(program, "a_position");
+                    gl.enableVertexAttribArray(positionAttributeLocation);
+                    gl.vertexAttribPointer(positionAttributeLocation, 3, gl.FLOAT, false, 6 * Float32Array.BYTES_PER_ELEMENT, 0);
+
+                    var colorAttributeLocation = gl.getAttribLocation(program,"vert_color");
+                    gl.enableVertexAttribArray(colorAttributeLocation);
+                    gl.vertexAttribPointer(colorAttributeLocation, 3, gl.FLOAT, false, 6 * Float32Array.BYTES_PER_ELEMENT, 3 * Float32Array.BYTES_PER_ELEMENT);
+                            
+                    gl.uniform3fv(gl.getUniformLocation(program, "transform"), new Float32Array(this.loc));
+                    gl.uniform3fv(gl.getUniformLocation(program, "rotation"), new Float32Array(this.rot));
+
+                    gl.drawArrays(gl.TRIANGLE_FAN, 0, this.numVertices);
+                }
+            }
+
+			// HELPER FUNCTION SCRIPTS
+			function loop() 
+			{
+            	let speed = 0.25;
+            	let rotSpeed = 0.01;
+            	let changed = false;
+
+                // Phase 2b: moving forward and backword
+                // BasicGameObject.js doesn't have built-in FPS-style movement vector calculator
+                // So it was solved by Gemini
+                let dirX = Math.sin(m.camRot[1]);
+                let dirZ = Math.cos(m.camRot[1]);
+
+                // Phase 3: shooting bullets
+                // applys directional velocity to bullets based on camera rotation, and spawns them 
+                // slightly in front of the camera to avoid immediate collision
+                // Solved by Gemini
+                if(m.keys[" "] && !m.spacePressed)
+                {
+                    m.spacePressed = true;
+
+                    let bullet = new Bullet();
+                    // Spawn slightly in front of the camera using the directional vectors
+                    bullet.loc = [m.camLoc[0] - dirX * 1.5, m.camLoc[1], m.camLoc[2] - dirZ * 1.5];
+                    bullet.rot[1] = m.camRot[1];
+
+                    let bulletSpeed = 1.5;
+                    // Apply velocity in the direction the camera is facing
+                    bullet.velocity = [-dirX * bulletSpeed, 0, -dirZ * bulletSpeed];
+
+                    m.bullets.push(bullet);
+                }
+
+                if(!m.keys[" "])
+                {
+                    m.spacePressed = false;
+                }
+
+                let nextCamLoc = [m.camLoc[0], m.camLoc[1], m.camLoc[2]];
+                let positionMoved = false;
+
+                // Phase 2b & 2c: Camera Movement via 'W', 'S', 'Z', 'X'
+                // Adjusts 'nextCamLoc' based on directional vectors and key input, then 
+                // checks for collisions before applying the movement
+                // Solved by Gemini
+            	if(m.keys["W"]) 
+				{ 
+					nextCamLoc[0] -= dirX * speed;
+                    nextCamLoc[2] -= dirZ * speed;
+                    positionMoved = true; // Move Forward
+				}
+
+            	if(m.keys["S"]) 
+				{ 
+					nextCamLoc[0] += dirX * speed;
+                    nextCamLoc[2] += dirZ * speed;
+                    positionMoved = true; // Move Backward
+				}
+
+                // Phase 2a: Camera Rotation via 'A' and 'D'
+            	if(m.keys["A"]) 
+				{ 
+					m.camRot[1] += rotSpeed; 
+                    changed = true; // Move Left
+				}
+
+            	if(m.keys["D"]) 
+				{ 
+					m.camRot[1] -= rotSpeed; 
+                    changed = true; // Move Right
+				}
+
+            	if(m.keys["Z"]) 
+				{ 
+					nextCamLoc[1] += speed; 
+                    positionMoved = true; // Move Up
+				}
+                
+            	if(m.keys["X"]) 
+				{ 
+					nextCamLoc[1] -= speed; 
+                    positionMoved = true; // Move Down
+				}
+
+                // Phase 2d: Camera Collision Detection
+                // Uses 3D distance formula to check if the next camera position is within a certain 
+                // radius of any asteroid, and only applies the movement if it's not colliding
+                // It tests proposed movement against all asteroid positions
+                // Solved by Gemini
+                if(positionMoved)
+                {
+                    let isColliding = false;
+                    let collisionRadius = 1.5;
+
+                    for(let i = 0; i < m.myShapes.length; i++)
+                    {
+                        let astLoc = m.myShapes[i].loc;
+                        let dx = nextCamLoc[0] - astLoc[0];
+                        let dy = nextCamLoc[1] - astLoc[1];
+                        let dz = nextCamLoc[2] - astLoc[2];
+                        if(Math.sqrt(dx * dx + dy * dy + dz * dz) < collisionRadius)
+                        {
+                            isColliding = true;
+                            break;
+                        }
+                    }
+                    if(!isColliding)
+                    {
+                        m.camLoc = nextCamLoc;
+                        changed = true;
+                    }
+                }
+
+            	if(changed) 
+				{
+                	gl.uniform3fv(gl.getUniformLocation(m.myWEBGL.program, 'worldLoc'), new Float32Array(m.camLoc));
+                	gl.uniform3fv(gl.getUniformLocation(m.myWEBGL.program, 'worldRot'), new Float32Array(m.camRot));
+            	}
+
+            	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            
+            	for(var i = 0; i < m.myShapes.length; i++) 
+				{
+					m.myShapes[i].Update();
+                	m.myShapes[i].Render(m.myWEBGL.program); 
+            	}
+
+                // Phase 3a: Asteroid Destruction and Bullet Collision
+                // Uses distance checking to see if any bullets are within a certain radius of any asteroids, and if so reduces the 
+                // asteroid's HP and removes the bullet. If an asteroid's HP reaches 0, it is removed from the array
+                // Also checks if bullets are too far from the camera and removes them to save resources
+                // Solved by Gemini
+                for(let i = m.bullets.length - 1; i >= 0; i--)
+                {
+                    let b = m.bullets[i];
+                    b.Move();
+                    let hitAsteroid = false;
+
+                    for(let j = m.myShapes.length - 1; j >= 0; j--)
+                    {
+                        let ast = m.myShapes[j];
+                        let dx = b.loc[0] - ast.loc[0];
+                        let dy = b.loc[1] - ast.loc[1];
+                        let dz = b.loc[2] - ast.loc[2];
+                        let distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+                        if(distance < 1.0) // Collision radius
+                        {
+                            ast.hp--;
+                            hitAsteroid = true;
+
+                            if(ast.hp <= 0)
+                            {
+                                m.myShapes.splice(j, 1); // Remove asteroid
+                            }
+                            break;
+                        }
+                    }
+
+                    let distFromCamera = Math.sqrt(
+                        Math.pow(b.loc[0] - m.camLoc[0], 2) +
+                        Math.pow(b.loc[2] - m.camLoc[2], 2)
+                    );
+
+                    if(hitAsteroid || distFromCamera > 250)
+                    {
+                        m.bullets.splice(i, 1); // Remove bullet
+                    }
+                    else
+                    {
+                        b.Render(m.myWEBGL.program);
+                    }
+                }
+            
+            	requestAnimationFrame(loop);
+        	}
+
+        	function keyDown(event) 
+			{               
+            	m.keys[String.fromCharCode(event.keyCode)] = true;
+        	}
+
+			function keyUp(event) 
+			{
+            	m.keys[String.fromCharCode(event.keyCode)] = false;
+        	}
+
+        	function canvasHandle(event) 
+			{
+            	console.log("Canvas clicked at: " + event.offsetX, event.offsetY);
+        	}
+        
+        	class main 
+			{    
+            	constructor() 
+				{
+                	this.myWEBGL = new WebGL_Interface();
+                	this.myShapes = [];
+                    this.bullets = [];
+                    this.keys = {};
+                    this.spacePressed = false;
+					
+                    // Phase 1c: Creates 200 asteroids and randomly places them
+                    // Places between -100 to 100 on the X and Z axes, and -10 to 10 on the Y axis
+					for(let i = 0; i < 200; i++)
+					{
+						let rock = new Asteroid();
+                        rock.loc = [
+                            (Math.random() * 200) - 100, 
+                            (Math.random() * 20) - 10, 
+                            (Math.random() * 200) - 100
+                        ];
+                        rock.rot = [
+                            Math.random() * 3.14, 
+                            Math.random() * 3.14, 
+                            Math.random() * 3.14
+                        ];
+
+                        // Phase 1d.i: Asteroid randomly rotates between 0.01 and 0.5
+                        // Randomly assigns positive or negative rotation for each axis
+                        let spinX = (Math.random() * 0.49) + 0.01;
+                        let spinY = (Math.random() * 0.49) + 0.01;
+                        let spinZ = (Math.random() * 0.49) + 0.01;
+
+                        if(Math.random() > 0.5) 
+                        {
+                            spinX *= -1;
+                        }
+                        if(Math.random() > 0.5) 
+                        {
+                            spinY *= -1;
+                        }
+                        if(Math.random() > 0.5) 
+                        {
+                            spinZ *= -1;
+                        }
+
+                        rock.angVelocity = [spinX, spinY, spinZ];
+                        this.myShapes.push(rock);
+					}
+                	
+					this.camLoc = [0, 0, 0];
+                	this.camRot = [0, 0, 0];
+					  
+                	// Initialize camera uniforms right away
+                	let camLocUniform  = gl.getUniformLocation(this.myWEBGL.program, 'worldLoc');
+                	gl.uniform3fv(camLocUniform, new Float32Array(this.camLoc));
+                
+                	let camRotUniform  = gl.getUniformLocation(this.myWEBGL.program, 'worldRot');
+                	gl.uniform3fv(camRotUniform, new Float32Array(this.camRot));
+            	}
+        	}		
+		</script>
+	</Head>
+	<BODY>		
+		<CANVAS id="myCanvas" width="640" height="400">
+			Your browser does not support canvas.
+		</CANVAS>
+
+		<SCRIPT>
+			var canvas = document.getElementById("myCanvas");
+			var gl = canvas.getContext("webgl");	
+			var m = new main();
+			window.onkeydown = keyDown;
+            window.onkeyup = keyUp;
+        	canvas.addEventListener("click", canvasHandle); 
+
+        	// Start the loop
+        	requestAnimationFrame(loop);			
+		</SCRIPT>	
+	</BODY>
+</HTML>

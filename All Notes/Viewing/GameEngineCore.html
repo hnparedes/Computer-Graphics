@@ -1,0 +1,306 @@
+<!DOCTYPE HTML>
+<HTML lang="en">
+	<Head>
+	<Title> Modularizing WebGL </TITLE>
+		
+		<!-- 
+		GLSL is the language used for shaders (GL Shader Language)
+		
+		Attribute - you specify how to pull the data out of the buffers you supply.
+		Buffers - Data loaded onto the GPU (Normally vertex information)
+		
+		Uniforms - global variables (in GLSL) that you set before you run the shader program
+		
+		Textures - Textures are arrays of data you can randomly acces in your shader program.  
+		
+		Varying - are way for a vertex shader to pass data to the fragmentShader.
+		-->
+		<script id="2dVertexShader" type="notjs">
+		attribute vec4 a_position;	
+		attribute vec3 vert_color;
+		varying vec3 fragColor;
+		
+		uniform vec3 transform;
+		uniform vec3 rotation;	
+		uniform vec3 worldLoc;
+		uniform vec3 worldRot;
+		
+		uniform float n;
+		uniform float f;
+		uniform float r;
+		uniform float t;
+		
+		vec4 MoveCamera(vec4 pos)
+		{
+			vec3 cw = cos(-1.0*worldRot);
+			vec3 sw = sin(-1.0*worldRot);
+			mat4 translateView = mat4(1.0, 0.0, 0.0, 0.0,
+						   		   	  0.0, 1.0, 0.0, 0.0,
+						   		   	  0.0, 0.0, 1.0, 0.0,
+						   		   	 -1.0*worldLoc.x,-1.0*worldLoc.y,worldLoc.z,1.0);
+
+			mat4 rotateView = mat4(cw.y,0.0,-1.0*sw.y,0.0,
+								  0.0,1.0,0.0,0.0,
+								  sw.y,0.0,cw.y,0.0,
+								  0.0,0.0,0.0,1.0);
+			return rotateView*translateView*pos;	
+		}
+
+		vec4 ApplyProjection(vec4 pos)
+		{
+			mat4 SimpleOrtho = mat4(1,0.0,0.0,0.0,
+								 	0.0,1,0.0,0.0,
+								 	0.0,0.0,1,0.0,
+								 	0.0,0.0,0.0,1);
+
+			mat4 ComplexPerspective = mat4(n/r,0.0,0.0,0.0,
+									 0.0,n/t,0.0,0.0,
+									 0.0,0.0,-1.0*(f+n)/(f-n),-1.0,
+									 0.0,0.0,-2.0*(f*n)/(f-n),0.0);
+			
+			mat4 ComplexOrtho = mat4(1.0/r,0.0,0.0,0.0,
+								  0.0,1.0/t,0.0,0.0,
+								  0.0,0.0,0.3,0.0,
+								  0.0,0.0,0.0,1.0);		
+								  
+			mat4 SimplePerspective = mat4(1.0,0.0,0.0,0.0,
+									 0.0,0.0,0.0,0.0,
+									 0.0,0.0,-1.0,-1.0,
+									 0.0,0.0,-2.0,0.0);
+
+			return SimplePerspective*pos;
+			
+		}
+
+		vec4 PositionObject(vec4 pos)
+		{
+			mat4 translateM = mat4(1.0,0.0,0.0,0.0,
+						   		   0.0,1.0,0.0,0.0,
+						   		   0.0,0.0,1.0,0.0,
+						   		   transform.x,transform.y,transform.z,1.0);
+			return translateM*pos;	
+		}
+		
+		vec4 RotateObject(vec4 pos)
+		{
+			vec3 c = cos(rotation);
+			vec3 s = sin(rotation);
+			
+			mat4 rotateY = mat4(c.y,0.0,-1.0*s.y,0.0,
+								0.0,1.0,0.0,0.0,
+								s.y,0.0,c.y,0.0,
+								0.0,0.0,0.0,1.0);
+			return rotateY*pos;	
+		}
+		
+		void main()
+        {
+            // Pass vertex color to fragment shader
+            fragColor = vert_color;
+
+            // 1. Model Matrix: Rotation around Y-axis then Translation
+            float c = cos(rotation.y);
+            float s = sin(rotation.y);
+            mat4 rotateYModel = mat4(
+                c,   0.0, -s,  0.0,
+                0.0, 1.0,  0.0, 0.0,
+                s,   0.0,  c,   0.0,
+                0.0, 0.0,  0.0, 1.0
+            );
+            
+            mat4 translateModel = mat4(
+                1.0, 0.0, 0.0, 0.0,
+                0.0, 1.0, 0.0, 0.0,
+                0.0, 0.0, 1.0, 0.0,
+                transform.x, transform.y, transform.z, 1.0
+            );
+
+            // 2. View Matrix: Inverse of Camera Transform
+            // We rotate the world the opposite way the camera rotates
+            float cw = cos(-worldRot.y);
+            float sw = sin(-worldRot.y);
+            mat4 rotateViewY = mat4(
+                cw,  0.0, -sw, 0.0,
+                0.0, 1.0,  0.0, 0.0,
+                sw,  0.0,  cw,  0.0,
+                0.0, 0.0,  0.0, 1.0
+            );
+            
+            mat4 translateView = mat4(
+                1.0, 0.0, 0.0, 0.0,
+                0.0, 1.0, 0.0, 0.0,
+                0.0, 0.0, 1.0, 0.0,
+                -worldLoc.x, -worldLoc.y, -worldLoc.z, 1.0
+            );
+
+            // 3. Perspective Projection Matrix
+            float aspect = 640.0 / 400.0;
+            float fov = 1.0; 
+            float rangeInv = 1.0 / (n - f);
+            float f_calc = 1.0 / tan(fov / 2.0);
+            
+            mat4 perspective = mat4(
+                f_calc / aspect, 0.0, 0.0, 0.0,
+                0.0, f_calc, 0.0, 0.0,
+                0.0, 0.0, (n + f) * rangeInv, -1.0,
+                0.0, 0.0, (2.0 * n * f) * rangeInv, 0.0
+            );
+            
+            // Order: Projection * View * Model * Position
+            gl_Position = perspective * rotateViewY * translateView * translateModel * rotateYModel * a_position;
+        }
+		</SCRIPT>
+		<script id="2dFragmentShader" type="notjs">
+		precision mediump float;
+		varying vec3 fragColor;
+		void main()
+		{
+			gl_FragColor = vec4(fragColor,1.0);
+		}
+		</script>
+		
+		<script src="webgl_interface.js"></script>
+		<script src="BasicGameObject.js"></script>
+		<script>
+			// HELPER FUNCTION SCRIPTS
+			function loop() 
+			{
+            	let speed = 1.0;
+            	let rotSpeed = 0.05;
+            	let changed = false;
+
+            	if(m.keys["W"]) 
+				{ 
+					m.camLoc[2] -= speed; changed = true; // Zoom In
+				}
+            	if(m.keys["S"]) 
+				{ 
+					m.camLoc[2] += speed; changed = true; // Zoom Out
+				}
+            	if(m.keys["A"]) 
+				{ 
+					m.camLoc[0] -= speed; changed = true; // Move Left
+				}
+            	if(m.keys["D"]) 
+				{ 
+					m.camLoc[0] += speed; changed = true; // Move Right
+				}
+            	if(m.keys["Z"]) 
+				{ 
+					m.camRot[1] -= rotSpeed; changed = true; // Rotate Left
+				}
+            	if(m.keys["X"]) 
+				{ 
+					m.camRot[1] += rotSpeed; changed = true; // Rotate Right
+				}
+            
+            	// Only send data to the GPU if the camera actually moved
+            	if (changed) 
+				{
+                	gl.uniform3fv(gl.getUniformLocation(m.myWEBGL.program, 'worldLoc'), new Float32Array(m.camLoc));
+                	gl.uniform3fv(gl.getUniformLocation(m.myWEBGL.program, 'worldRot'), new Float32Array(m.camRot));
+            	}
+
+            	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            
+            	for(var i = 0; i < m.myShapes.length; i++) 
+				{
+					m.myShapes[i].rot[1] += 0.02;
+                	m.myShapes[i].Render(m.myWEBGL.program); 
+            	}
+            
+            	requestAnimationFrame(loop);
+        	}
+
+        	function checkForCollision(x, y) 
+			{
+            	// Basic placeholder: Add your collision logic here
+            	return false;
+        	}
+
+        	function keyDown(event) 
+			{               
+            	let key = String.fromCharCode(event.keyCode);
+            	m.keys[key] = true;
+        	}
+
+			function keyUp(event) 
+			{
+            	let key = String.fromCharCode(event.keyCode);
+            	m.keys[key] = false;
+        	}
+
+        	function canvasHandle(event) 
+			{
+            	console.log("Canvas clicked at: " + event.offsetX, event.offsetY);
+        	}
+        
+        	class main 
+			{    
+            	constructor() 
+				{
+                	this.myWEBGL = new WebGL_Interface();
+                	this.myShapes = [];
+                
+                	// Ensure Triangle1 exists and is configured properly in Triangle1.js
+                	// Create 64 triangles (8x8 grid)
+					let gridSize = 16;
+					let spacing = 2; // Adjust spacing as needed
+					
+					for(let i = 0; i < gridSize; i++)
+					{
+						for(let j = 0; j < gridSize; j++)
+						{
+							let tri = new Triangle1();
+
+							let x = (i - gridSize / 2) * spacing;
+							let y = (j - gridSize / 2) * spacing;
+
+							tri.loc = [x, y, -20];
+							tri.rot = [0, 0, 0];
+
+							this.myShapes.push(tri);
+						}
+					}
+                	
+					this.camLoc = [0, 0, 0];
+                	this.camRot = [0, 0, 0];
+					this.keys = {};
+					  
+                	// Initialize camera uniforms right away
+                	let camLocUniform  = gl.getUniformLocation(this.myWEBGL.program, 'worldLoc');
+                	gl.uniform3fv(camLocUniform, new Float32Array(this.camLoc));
+                
+                	let camRotUniform  = gl.getUniformLocation(this.myWEBGL.program, 'worldRot');
+                	gl.uniform3fv(camRotUniform, new Float32Array(this.camRot));
+            	}
+        	}		
+		</script>
+	</Head>
+	<BODY>
+		<HEADER>
+		</HEADER>
+		
+		<CANVAS id="myCanvas" width="640" height="400">
+			Your browser does not support canvas.
+		</CANVAS>
+		
+		<FOOTER>	
+		</FOOTER>
+		<SCRIPT>
+			var canvas = document.getElementById("myCanvas");
+			var gl = canvas.getContext("webgl");	
+			var m = new main();
+			window.onload = function() 
+			{
+            	m = new main();
+        	}
+        	window.onkeydown = keyDown;
+        	window.onkeyup = keyUp;
+        	canvas.addEventListener("click", canvasHandle); 
+
+        	// Start the loop
+        	requestAnimationFrame(loop);			
+		</SCRIPT>	
+	</BODY>
+</HTML>	
